@@ -1,8 +1,8 @@
 using HtmlAgilityPack;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Web;  // För HtmlDecode
 
 namespace AzureSearchCrawler
 {
@@ -19,81 +19,62 @@ namespace AzureSearchCrawler
 
         public virtual Dictionary<string, string> ExtractText(bool extractText, string content)
         {
+            var result = new Dictionary<string, string>
+            {
+                ["title"] = string.Empty,  // Initiera med tom sträng
+                ["content"] = string.Empty // Initiera med tom sträng
+            };
+
             HtmlDocument doc = new();
             doc.LoadHtml(content);
-            string body;
-            if (extractText)
-                body = GetCleanedUpTextForXpath(doc, "//body");
-            else
-                body = doc.DocumentNode.SelectSingleNode("//body").InnerHtml;
 
-            Dictionary<string, string> page = new()
+            // Extrahera title
+            var titleNode = doc.DocumentNode.SelectSingleNode("//title");
+            if (titleNode != null)
             {
-                { "content", body },
-                { "title", doc.DocumentNode.SelectSingleNode("//title").InnerText }
-            };
-            return page;
-        }
-
-        public string GetCleanedUpTextForXpath(HtmlDocument doc, string xpath)
-        {
-            if (doc == null || doc.DocumentNode == null)
-            {
-                return null;
+                result["title"] = HttpUtility.HtmlDecode(titleNode.InnerText.Trim());
             }
 
-            RemoveNodesOfType(doc, "script", "style", "svg", "path");
-
-            string content = ExtractTextFromFirstMatchingElement(doc, xpath);
-            return NormalizeWhitespace(content);
-        }
-
-        protected string NormalizeWhitespace(string content)
-        {
-            if (content == null)
+            // Content beror på extractText-flaggan
+            var bodyNode = doc.DocumentNode.SelectSingleNode("//body");
+            if (bodyNode != null)
             {
-                return null;
+                if (extractText)
+                {
+                    result["content"] = GetCleanedUpTextForXpath(doc, "//body");
+                }
+                else
+                {
+                    result["content"] = bodyNode.InnerHtml;
+                }
             }
 
-            content = newlines.Replace(content, "\n");
-            return spaces.Replace(content, " ");
+            return result;
         }
 
-        protected void RemoveNodesOfType(HtmlDocument doc, params string[] types)
+        protected string GetCleanedUpTextForXpath(HtmlDocument doc, string xpath)
         {
-            string xpath = String.Join(" | ", types.Select(t => "//" + t));
-            RemoveNodes(doc, xpath);
-        }
+            var node = doc.DocumentNode.SelectSingleNode(xpath);
 
-        protected void RemoveNodes(HtmlDocument doc, string xpath)
-        {
-            var nodes = SafeSelectNodes(doc, xpath).ToList();
-            // Console.WriteLine("Removing {0} nodes matching {1}.", nodes.Count, xpath);
-            foreach (var node in nodes)
+            foreach (var script in node.SelectNodes(".//script|.//style|.//svg|.//path")?.ToList() ?? new List<HtmlNode>())
             {
-                node.Remove();
+                script.Remove();
             }
+
+            var textParts = node.Descendants()
+                .Where(n => !n.HasChildNodes && !string.IsNullOrWhiteSpace(n.InnerText))
+                .Select(n => HttpUtility.HtmlDecode(n.InnerText.Trim()))
+                .Where(t => !string.IsNullOrWhiteSpace(t));
+
+            var text = string.Join(" ", textParts);
+            text = newlines.Replace(text, " ");
+            text = spaces.Replace(text, " ");
+            return text.Trim();
         }
 
-        /// <summary>
-        /// Returns InnerText of the first element matching the xpath expression, or null if no elements match.
-        /// </summary>
-        protected string ExtractTextFromFirstMatchingElement(HtmlDocument doc, string xpath)
-        {
-            return SafeSelectNodes(doc, xpath).FirstOrDefault()?.InnerText;
-        }
-
-        /// <summary>
-        /// Null-safe DocumentNode.SelectNodes
-        /// </summary>
-        protected IEnumerable<HtmlNode> SafeSelectNodes(HtmlDocument doc, string xpath)
-        {
-            return doc.DocumentNode.SelectNodes(xpath) ?? Enumerable.Empty<HtmlNode>();
-        }
-
-        [GeneratedRegex(@"(\r\n|\n)+")]
+        [GeneratedRegex("[\r\n]+")]
         private static partial Regex MyRegex();
-        [GeneratedRegex(@"[ \t]+")]
+        [GeneratedRegex("[ \t]+")]
         private static partial Regex MyRegex1();
     }
 }
