@@ -1,6 +1,6 @@
 # About
 
-This is a fork of thomas11/AzureSearchCrawler:master
+This is a fork of thomas11/AzureSearchCrawler:master(https://github.com/thomas11/AzureSearchCrawler) with additions of crawling multiple sites at once and using vector fields in the AI search index.
 
 [Azure AI Search](https://azure.microsoft.com/en-us/products/ai-services/ai-search/) delivers accurate, hyper-personalized responses in your Gen AI applications. This project helps you get content from a website into an Azure AI Search index. It uses [Abot](https://github.com/sjdirect/abot) to crawl websites. For each page it extracts the content in a customizable way and indexes it into Azure Search.
 
