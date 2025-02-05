@@ -131,7 +131,6 @@ namespace AzureSearchCrawler
                     {
                         if (!sitesFile.Exists)
                         {
-                            //console.Write($"Sites file not found: {sitesFile.FullName}");
                             console.Error.Write($"Sites file not found: {sitesFile.FullName}{Environment.NewLine}");
                             exitCode = 1;
                             return;
@@ -146,7 +145,6 @@ namespace AzureSearchCrawler
 
                             if (sites == null || sites.Count == 0)
                             {
-                                //console.Write($"Could not read sites from file: {sitesFile.FullName}");
                                 console.Error.Write($"Could not read sites from file: {sitesFile.FullName}{Environment.NewLine}");
                                 exitCode = 1;
                                 return;
@@ -156,7 +154,6 @@ namespace AzureSearchCrawler
                             {
                                 if (!Uri.TryCreate(site.Uri, UriKind.Absolute, out var uri))
                                 {
-                                    //console.Write($"Invalid URI in sites file: {site.Uri}");
                                     console.Error.Write($"Invalid URI in sites file: {site.Uri}{Environment.NewLine}");
                                     continue;
                                 }
@@ -167,7 +164,6 @@ namespace AzureSearchCrawler
                         }
                         catch (JsonException ex)
                         {
-                            //console.Write($"Error parsing sites file: {ex.Message}");
                             console.Error.Write($"Error parsing sites file: {ex.Message}{Environment.NewLine}");
                             exitCode = 1;
                             return;

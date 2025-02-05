@@ -8,7 +8,6 @@ namespace AzureSearchCrawler.Tests
     {
         private readonly Mock<ICrawler> _crawlerMock;
         private readonly CrawlerMain _crawlerMain;
-        //private readonly IConsole _console;
         private readonly StringWriter _consoleOutput;
         private readonly StringWriter _consoleError;
         private readonly TextWriter _originalOut;
@@ -17,7 +16,6 @@ namespace AzureSearchCrawler.Tests
         public CrawlerMainTests()
         {
             _crawlerMock = new Mock<ICrawler>();
-            //_console = new TestConsole();
             _originalOut = Console.Out;
             _originalError = Console.Error;
             _consoleOutput = new StringWriter();
@@ -238,7 +236,6 @@ namespace AzureSearchCrawler.Tests
 
                 // Assert
                 Assert.Equal(0, result);
-                //Assert.Contains("Invalid URI in sites file: invalid-url", testConsole.Output);
                 Assert.Contains("Invalid URI in sites file: invalid-url", string.Join(Environment.NewLine, testConsole.Errors));
                 _crawlerMock.Verify(c => c.CrawlAsync(
                     It.Is<Uri>(u => u.Host == "valid-site.com"),
@@ -270,7 +267,6 @@ namespace AzureSearchCrawler.Tests
 
             // Assert
             Assert.Equal(1, result);
-            //Assert.Contains("Sites file not found:", testConsole.Output);
             Assert.Contains("Sites file not found:", string.Join(Environment.NewLine, testConsole.Errors));
         }
 
@@ -299,7 +295,6 @@ namespace AzureSearchCrawler.Tests
                 Assert.Equal(1, result);
                 //Error parsing sites file:
                 Assert.Contains("Error parsing sites file:", string.Join(Environment.NewLine, testConsole.Errors));
-                //Assert.Contains("Error parsing sites file:", testConsole.Output);
             }
             finally
             {
