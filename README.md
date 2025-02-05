@@ -1,5 +1,7 @@
 # About
 
+This is a fork of thomas11/AzureSearchCrawler:master
+
 [Azure AI Search](https://azure.microsoft.com/en-us/products/ai-services/ai-search/) delivers accurate, hyper-personalized responses in your Gen AI applications. This project helps you get content from a website into an Azure AI Search index. It uses [Abot](https://github.com/sjdirect/abot) to crawl websites. For each page it extracts the content in a customizable way and indexes it into Azure Search.
 
 This project is intended as a demo or a starting point for a real crawler. At a minimum, you'll want to replace the console messages with proper logging, and customize the text extraction to improve results for your use case.
