@@ -1,9 +1,10 @@
 using Abot2.Crawler;
 using Abot2.Poco;
+using AzureSearchCrawler.Interfaces;
 using System;
 using System.Net;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace AzureSearchCrawler
 {
@@ -11,59 +12,89 @@ namespace AzureSearchCrawler
     ///  A convenience wrapper for an Abot crawler with a reasonable default configuration and console logging.
     ///  The actual action to be performed on the crawled pages is passed in as a CrawlHandler.
     /// </summary>
-    class Crawler
+    public class Crawler : ICrawler
     {
         private static int PageCount = 0;
 
         private readonly CrawlHandler _handler;
+        private readonly Func<CrawlConfiguration, IWebCrawler> _crawlerFactory;
+        private readonly IConsole _console;
 
-        public Crawler(CrawlHandler handler)
+        public Crawler(CrawlHandler handler, IConsole console)
+            : this(handler, config => new PoliteWebCrawler(config), console)
         {
-            _handler = handler;
         }
 
-        public async Task Crawl(string rootUri, int maxPages, int maxDepth)
+        public Crawler(CrawlHandler handler, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, IConsole console)
         {
-            PoliteWebCrawler crawler = new(CreateCrawlConfiguration(maxPages, maxDepth), null, null, null, null, null, null, null, null);
-
-            crawler.PageCrawlStarting += crawler_ProcessPageCrawlStarting;
-            crawler.PageCrawlCompleted += crawler_ProcessPageCrawlCompleted;
-
-            CrawlResult result = await crawler.CrawlAsync(new Uri(rootUri)); //This is synchronous, it will not go to the next line until the crawl has completed
-            if (result.ErrorOccurred)
-            {
-                Console.WriteLine("Crawl of {0} ({1} pages) completed with error: {2}", result.RootUri.AbsoluteUri, PageCount, result.ErrorException.Message);
-            }
-            else
-            {
-                Console.WriteLine("Crawl of {0} ({1} pages) completed without error.", result.RootUri.AbsoluteUri, PageCount);
-            }
-
-            await _handler.CrawlFinishedAsync();
+            _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+            _crawlerFactory = crawlerFactory ?? throw new ArgumentNullException(nameof(crawlerFactory));
+            _console = console ?? throw new ArgumentNullException(nameof(console));
         }
 
-        void crawler_ProcessPageCrawlStarting(object sender, PageCrawlStartingArgs e)
+        public async Task CrawlAsync(Uri rootUri, int maxPages, int maxDepth)
         {
+            PageCount = 0;
+
+            if (maxPages <= 0)
+                throw new ArgumentException("maxPages must be greater than 0", nameof(maxPages));
+
+            if (maxDepth <= 0)
+                throw new ArgumentException("maxDepth must be greater than 0", nameof(maxDepth));
+
+            var config = CreateCrawlConfiguration(maxPages, maxDepth);
+            IWebCrawler crawler = _crawlerFactory(config);
+
+            crawler.PageCrawlStarting += (sender, args) => crawler_ProcessPageCrawlStarting(sender!, args);
+            crawler.PageCrawlCompleted += (sender, args) => crawler_ProcessPageCrawlCompleted(sender!, args);
+
+            try
+            {
+                _console.WriteLine($"Starting crawl of {rootUri.AbsoluteUri} (max {maxPages} pages, depth {maxDepth})");
+                var result = await crawler.CrawlAsync(rootUri);
+
+                var status = result.ErrorOccurred ? "with error" : "without error";
+                _console.WriteLine($"Crawl of {rootUri.AbsoluteUri} ({PageCount} pages) completed {status}");
+
+                if (result.ErrorOccurred && result.ErrorException != null)
+                {
+                    _console.WriteError($"Error: {result.ErrorException.Message}");
+                }
+
+                await _handler.CrawlFinishedAsync();
+            }
+            finally
+            {
+                crawler.PageCrawlStarting -= crawler_ProcessPageCrawlStarting;
+                crawler.PageCrawlCompleted -= crawler_ProcessPageCrawlCompleted;
+            }
+        }
+
+        private void crawler_ProcessPageCrawlStarting(object? sender, PageCrawlStartingArgs args)
+        {
+            ArgumentNullException.ThrowIfNull(args);
             Interlocked.Increment(ref PageCount);
 
-            PageToCrawl pageToCrawl = e.PageToCrawl;
-            Console.WriteLine("{0}  found on  {1}, Depth: {2}", pageToCrawl.Uri.AbsoluteUri, pageToCrawl.ParentUri.AbsoluteUri, pageToCrawl.CrawlDepth);
+            PageToCrawl pageToCrawl = args.PageToCrawl;
+            var parentUri = pageToCrawl.ParentUri?.AbsoluteUri ?? "root";
+            LogMessage($"{pageToCrawl.Uri.AbsoluteUri}  found on  {parentUri}, Depth: {pageToCrawl.CrawlDepth}");
         }
 
-        async void crawler_ProcessPageCrawlCompleted(object sender, PageCrawlCompletedArgs e)
+        private async void crawler_ProcessPageCrawlCompleted(object? sender, PageCrawlCompletedArgs args)
         {
-            CrawledPage crawledPage = e.CrawledPage;
+            ArgumentNullException.ThrowIfNull(args);
+            CrawledPage crawledPage = args.CrawledPage;
             string uri = crawledPage.Uri.AbsoluteUri;
 
             if (crawledPage.HttpRequestException != null || crawledPage.HttpResponseMessage?.StatusCode != HttpStatusCode.OK)
             {
-                Console.WriteLine("Crawl of page failed {0}: exception '{1}', response status {2}", uri, crawledPage.HttpRequestException?.Message, crawledPage.HttpResponseMessage?.StatusCode);
+                LogMessage($"Crawl of page failed {uri}: exception '{crawledPage.HttpRequestException?.Message}', response status {crawledPage.HttpResponseMessage?.StatusCode}");
                 return;
             }
 
             if (string.IsNullOrEmpty(crawledPage.Content.Text))
             {
-                Console.WriteLine("Page had no content {0}", uri);
+                LogMessage($"Page had no content {uri}");
                 return;
             }
 
@@ -87,6 +118,11 @@ namespace AzureSearchCrawler
             };
 
             return crawlConfig;
+        }
+
+        private void LogMessage(string message)
+        {
+            _console.WriteLine(message);
         }
     }
 }

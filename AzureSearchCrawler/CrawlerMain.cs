@@ -1,3 +1,8 @@
+using AzureSearchCrawler.Interfaces;
+using System.CommandLine;
+using System.CommandLine.Invocation;
+using System.CommandLine.IO;  // För SystemConsole
+using System.CommandLine.Parsing;
 using Fclp;
 using System;
 
@@ -84,8 +89,8 @@ namespace AzureSearchCrawler
             Arguments arguments = p.Object;
 
             var indexer = new AzureSearchIndexer(arguments.ServiceEndPoint, arguments.IndexName, arguments.AdminApiKey, arguments.ExtractText, new TextExtractor());
-            var crawler = new Crawler(indexer);
-            crawler.Crawl(arguments.RootUri, maxPages: arguments.MaxPagesToIndex, maxDepth: arguments.MaxCrawlDepth).Wait();
+            var crawler = new Crawler(indexer, new SystemConsoleAdapter(new SystemConsole()));
+            crawler.CrawlAsync(new Uri(arguments.RootUri), maxPages: arguments.MaxPagesToIndex, maxDepth: arguments.MaxCrawlDepth).Wait();
 
         }
     }
