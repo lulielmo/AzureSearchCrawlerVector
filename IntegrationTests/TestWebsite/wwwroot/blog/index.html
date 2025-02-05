@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Test Website - Blog</title>
+    <link rel="stylesheet" href="/css/site.css">
+    <style>
+        .blog-hero {
+            background: linear-gradient(135deg, #2c5282, #4299e1);
+            color: white;
+            padding: 4rem 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+            animation: fadeIn 1s ease-out;
+        }
+
+        .blog-hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .blog-hero p {
+            font-size: 1.2rem;
+            max-width: 800px;
+            margin: 0 auto;
+            opacity: 0.9;
+        }
+
+        .blog-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+        }
+
+        .blog-main {
+            display: grid;
+            gap: 2rem;
+        }
+
+        .blog-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            transition: transform 0.3s ease;
+            animation: fadeInUp 1s ease-out;
+        }
+
+        .blog-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .blog-image {
+            height: 200px;
+            background: linear-gradient(135deg, #4299e1, #2c5282);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 3rem;
+        }
+
+        .blog-content {
+            padding: 1.5rem;
+        }
+
+        .blog-date {
+            color: #718096;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .blog-title {
+            font-size: 1.5rem;
+            color: #2d3748;
+            margin-bottom: 1rem;
+        }
+
+        .blog-excerpt {
+            color: #4a5568;
+            margin-bottom: 1rem;
+            line-height: 1.6;
+        }
+
+        .blog-link {
+            display: inline-block;
+            background: #2c5282;
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: background-color 0.3s ease;
+        }
+
+        .blog-link:hover {
+            background: #4299e1;
+        }
+
+        .blog-sidebar {
+            display: grid;
+            gap: 2rem;
+        }
+
+        .sidebar-section {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            animation: fadeIn 1s ease-out;
+        }
+
+        .sidebar-section h2 {
+            color: #2c5282;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .tag-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .tag {
+            background: #e2e8f0;
+            padding: 0.3rem 0.8rem;
+            border-radius: 9999px;
+            font-size: 0.9rem;
+            color: #4a5568;
+            transition: background-color 0.3s ease;
+        }
+
+        .tag:hover {
+            background: #cbd5e0;
+        }
+
+        @media (max-width: 768px) {
+            .blog-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/">Home</a>
+        <a href="/about.html">About</a>
+        <a href="/contact.html">Contact</a>
+        <a href="/products/">Products</a>
+        <a href="/blog/">Blog</a>
+    </nav>
+
+    <div class="blog-hero">
+        <h1>Vår Blogg</h1>
+        <p>Läs om de senaste nyheterna och insikterna inom webbcrawling och innehållsanalys</p>
+    </div>
+
+    <div class="blog-container">
+        <div class="blog-main">
+            <article class="blog-card">
+                <div class="blog-image">🔍</div>
+                <div class="blog-content">
+                    <div class="blog-date">2024-03-15</div>
+                    <h2 class="blog-title">Azure Search Integration</h2>
+                    <p class="blog-excerpt">
+                        Lär dig hur du kan integrera Azure Search med din 
+                        crawling-lösning för bättre sökresultat och innehållshantering.
+                    </p>
+                    <a href="/blog/posts/azure-search-integration.html" class="blog-link">Läs mer →</a>
+                </div>
+            </article>
+
+            <article class="blog-card">
+                <div class="blog-image">⚡</div>
+                <div class="blog-content">
+                    <div class="blog-date">2024-03-13</div>
+                    <h2 class="blog-title">Optimering av Crawling</h2>
+                    <p class="blog-excerpt">
+                        Tips och tricks för att optimera crawling-processen 
+                        och hantera stora webbplatser effektivt.
+                    </p>
+                    <a href="/blog/posts/crawling-optimization.html" class="blog-link">Läs mer →</a>
+                </div>
+            </article>
+
+            <article class="blog-card">
+                <div class="blog-image">🧪</div>
+                <div class="blog-content">
+                    <div class="blog-date">2024-03-10</div>
+                    <h2 class="blog-title">Testa Webbcrawlers</h2>
+                    <p class="blog-excerpt">
+                        En guide till hur du effektivt testar och validerar 
+                        webbcrawlers för bästa resultat.
+                    </p>
+                    <a href="/blog/posts/testing-web-crawlers.html" class="blog-link">Läs mer →</a>
+                </div>
+            </article>
+        </div>
+
+        <aside class="blog-sidebar">
+            <div class="sidebar-section">
+                <h2>Kategorier</h2>
+                <ul style="list-style: none; padding: 0;">
+                    <li>Tekniska guider</li>
+                    <li>Bästa praxis</li>
+                    <li>Nyheter</li>
+                    <li>Produktuppdateringar</li>
+                </ul>
+            </div>
+
+            <div class="sidebar-section">
+                <h2>Populära taggar</h2>
+                <div class="tag-cloud">
+                    <span class="tag">Azure</span>
+                    <span class="tag">Crawling</span>
+                    <span class="tag">SEO</span>
+                    <span class="tag">Performance</span>
+                    <span class="tag">AI</span>
+                    <span class="tag">Integration</span>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h2>Arkiv</h2>
+                <ul style="list-style: none; padding: 0;">
+                    <li>Mars 2024</li>
+                    <li>Februari 2024</li>
+                    <li>Januari 2024</li>
+                </ul>
+            </div>
+        </aside>
+    </div>
+</body>
+</html> 

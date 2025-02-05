@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Test Website - About</title>
+    <link rel="stylesheet" href="/css/site.css">
+    <style>
+        .about-hero {
+            background: linear-gradient(135deg, #2c5282, #4299e1);
+            color: white;
+            padding: 4rem 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+            animation: fadeIn 1s ease-out;
+        }
+
+        .about-hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .about-hero p {
+            font-size: 1.2rem;
+            max-width: 800px;
+            margin: 0 auto;
+            opacity: 0.9;
+        }
+
+        .timeline {
+            max-width: 800px;
+            margin: 4rem auto;
+            padding: 0 2rem;
+        }
+
+        .timeline-item {
+            position: relative;
+            padding-left: 2rem;
+            padding-bottom: 3rem;
+            animation: fadeInUp 1s ease-out;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 2px;
+            background: #4299e1;
+        }
+
+        .timeline-item::after {
+            content: '';
+            position: absolute;
+            left: -4px;
+            top: 0;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4299e1;
+        }
+
+        .timeline-date {
+            font-weight: bold;
+            color: #2c5282;
+            margin-bottom: 0.5rem;
+        }
+
+        .values-section {
+            background: #f7fafc;
+            padding: 4rem 2rem;
+            margin: 2rem 0;
+        }
+
+        .values-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .value-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            transition: transform 0.3s ease;
+            animation: fadeIn 1s ease-out;
+        }
+
+        .value-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .value-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: #2c5282;
+        }
+
+        .team-section {
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 2rem auto;
+        }
+
+        .team-stat {
+            animation: fadeIn 1s ease-out;
+        }
+
+        .team-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #2c5282;
+            margin-bottom: 0.5rem;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/">Home</a>
+        <a href="/about.html">About</a>
+        <a href="/contact.html">Contact</a>
+        <a href="/products/">Products</a>
+        <a href="/blog/">Blog</a>
+    </nav>
+
+    <div class="about-hero">
+        <h1>Om Crawler Technologies</h1>
+        <p>Vi har revolutionerat webbcrawling sedan 2015 med innovation, 
+           passion och teknisk excellens som drivkraft.</p>
+    </div>
+
+    <div class="timeline">
+        <h2>Vår Historia</h2>
+        <div class="timeline-item">
+            <div class="timeline-date">2015</div>
+            <h3>Grundandet</h3>
+            <p>Crawler Technologies grundades av en grupp passionerade utvecklare 
+               med visionen att revolutionera webbcrawling.</p>
+        </div>
+        <div class="timeline-item">
+            <div class="timeline-date">2017</div>
+            <h3>Första Enterprise-kunden</h3>
+            <p>Lansering av vår enterprise-lösning och partnerskap med 
+               flera Fortune 500-företag.</p>
+        </div>
+        <div class="timeline-item">
+            <div class="timeline-date">2020</div>
+            <h3>AI-integration</h3>
+            <p>Implementering av avancerad AI-teknologi för intelligent 
+               innehållsanalys och kategorisering.</p>
+        </div>
+        <div class="timeline-item">
+            <div class="timeline-date">2024</div>
+            <h3>Global Expansion</h3>
+            <p>Öppning av nya kontor i Europa och Asien för att stödja 
+               vår växande internationella kundbas.</p>
+        </div>
+    </div>
+
+    <div class="values-section">
+        <h2 style="text-align: center; margin-bottom: 2rem;">Våra Värderingar</h2>
+        <div class="values-grid">
+            <div class="value-card">
+                <div class="value-icon">💡</div>
+                <h3>Innovation</h3>
+                <p>Vi driver ständigt teknologin framåt genom att tänka utanför boxen.</p>
+            </div>
+            <div class="value-card">
+                <div class="value-icon">🤝</div>
+                <h3>Samarbete</h3>
+                <p>Tillsammans med våra kunder skapar vi framtidens lösningar.</p>
+            </div>
+            <div class="value-card">
+                <div class="value-icon">⚡</div>
+                <h3>Excellence</h3>
+                <p>Vi strävar alltid efter högsta kvalitet i allt vi gör.</p>
+            </div>
+            <div class="value-card">
+                <div class="value-icon">🌍</div>
+                <h3>Hållbarhet</h3>
+                <p>Vi bygger lösningar med långsiktig hållbarhet i fokus.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="team-section">
+        <h2>Vårt Team i Siffror</h2>
+        <div class="team-grid">
+            <div class="team-stat">
+                <div class="team-number">50+</div>
+                <div>Anställda</div>
+            </div>
+            <div class="team-stat">
+                <div class="team-number">12</div>
+                <div>Länder</div>
+            </div>
+            <div class="team-stat">
+                <div class="team-number">15+</div>
+                <div>Språk</div>
+            </div>
+            <div class="team-stat">
+                <div class="team-number">80%</div>
+                <div>Tech-fokuserade roller</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

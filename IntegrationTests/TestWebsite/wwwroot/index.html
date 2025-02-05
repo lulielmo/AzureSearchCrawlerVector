@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Test Website - Home</title>
+    <link rel="stylesheet" href="/css/site.css">
+    <style>
+        .hero {
+            background: linear-gradient(135deg, #2c5282, #4299e1);
+            color: white;
+            padding: 4rem 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            animation: fadeInUp 1s ease-out;
+        }
+
+        .hero p {
+            font-size: 1.5rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+            animation: fadeInUp 1s ease-out 0.2s;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+            animation: fadeIn 1s ease-out;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: #2c5282;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            padding: 4rem 2rem;
+            background: #f7fafc;
+            text-align: center;
+        }
+
+        .stat-item {
+            animation: fadeIn 1s ease-out;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #2c5282;
+            margin-bottom: 0.5rem;
+        }
+
+        .cta-section {
+            text-align: center;
+            padding: 4rem 2rem;
+            background: linear-gradient(135deg, #4299e1, #2c5282);
+            color: white;
+            margin-top: 2rem;
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 1rem 2rem;
+            background: white;
+            color: #2c5282;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-top: 1rem;
+            transition: transform 0.3s ease;
+        }
+
+        .cta-button:hover {
+            transform: scale(1.05);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/">Home</a>
+        <a href="/about.html">About</a>
+        <a href="/contact.html">Contact</a>
+        <a href="/products/">Products</a>
+        <a href="/blog/">Blog</a>
+    </nav>
+
+    <div class="hero">
+        <h1>Välkommen till Crawler Technologies</h1>
+        <p>Vi revolutionerar hur företag hanterar och analyserar webbinnehåll</p>
+    </div>
+
+    <div class="features">
+        <div class="feature-card">
+            <div class="feature-icon">🚀</div>
+            <h2>Högpresterande</h2>
+            <p>Vår crawling-teknologi är optimerad för maximal prestanda och skalbarhet.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🤖</div>
+            <h2>AI-Driven</h2>
+            <p>Avancerad AI-teknologi för intelligent innehållsanalys och kategorisering.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🛡️</div>
+            <h2>Säker & Pålitlig</h2>
+            <p>Byggd med säkerhet i fokus och garanterad upptid för kritiska system.</p>
+        </div>
+    </div>
+
+    <div class="stats">
+        <div class="stat-item">
+            <div class="stat-number">1M+</div>
+            <div>Sidor Crawlade per Dag</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">99.9%</div>
+            <div>Upptid</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">500+</div>
+            <div>Nöjda Kunder</div>
+        </div>
+    </div>
+
+    <div class="cta-section">
+        <h2>Redo att börja?</h2>
+        <p>Upptäck kraften i modern webbcrawling</p>
+        <a href="/products/" class="cta-button">Utforska våra produkter</a>
+    </div>
+</body>
+</html> 

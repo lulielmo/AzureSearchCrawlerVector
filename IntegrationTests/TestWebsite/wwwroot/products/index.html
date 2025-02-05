@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Test Website - Products</title>
+    <link rel="stylesheet" href="/css/site.css">
+    <style>
+        .products-hero {
+            background: linear-gradient(135deg, #2c5282, #4299e1);
+            color: white;
+            padding: 4rem 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+            animation: fadeIn 1s ease-out;
+        }
+
+        .products-hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .products-hero p {
+            font-size: 1.2rem;
+            max-width: 800px;
+            margin: 0 auto;
+            opacity: 0.9;
+        }
+
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            transition: transform 0.3s ease;
+            animation: fadeInUp 1s ease-out;
+        }
+
+        .product-card:hover {
+            transform: translateY(-10px);
+        }
+
+        .product-header {
+            background: linear-gradient(135deg, #2c5282, #4299e1);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .product-header h2 {
+            margin: 0;
+            font-size: 1.8rem;
+        }
+
+        .product-price {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 1rem 0;
+        }
+
+        .product-content {
+            padding: 2rem;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .feature-list li {
+            padding: 0.5rem 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .feature-list li::before {
+            content: '✓';
+            color: #2c5282;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .product-cta {
+            display: block;
+            background: #2c5282;
+            color: white;
+            text-decoration: none;
+            padding: 1rem 2rem;
+            text-align: center;
+            margin-top: 1.5rem;
+            border-radius: 4px;
+            transition: background-color 0.3s ease;
+        }
+
+        .product-cta:hover {
+            background: #4299e1;
+        }
+
+        .comparison-section {
+            background: #f7fafc;
+            padding: 4rem 2rem;
+            margin-top: 2rem;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 2rem auto;
+            text-align: center;
+        }
+
+        .comparison-item {
+            animation: fadeIn 1s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/">Home</a>
+        <a href="/about.html">About</a>
+        <a href="/contact.html">Contact</a>
+        <a href="/products/">Products</a>
+        <a href="/blog/">Blog</a>
+    </nav>
+
+    <div class="products-hero">
+        <h1>Våra Produkter</h1>
+        <p>Upptäck våra kraftfulla crawling-lösningar anpassade för dina behov</p>
+    </div>
+
+    <div class="products-grid">
+        <div class="product-card">
+            <div class="product-header">
+                <h2>Webbcrawler Pro</h2>
+                <div class="product-price">9 999 kr</div>
+            </div>
+            <div class="product-content">
+                <ul class="feature-list">
+                    <li>Parallell crawling</li>
+                    <li>Inbyggd robots.txt-hantering</li>
+                    <li>Intelligent köhantering</li>
+                    <li>Automatisk återhämtning</li>
+                    <li>Detaljerad loggning</li>
+                </ul>
+                <a href="product1.html" class="product-cta">Läs mer</a>
+            </div>
+        </div>
+
+        <div class="product-card">
+            <div class="product-header">
+                <h2>Enterprise Edition</h2>
+                <div class="product-price">24 999 kr</div>
+            </div>
+            <div class="product-content">
+                <ul class="feature-list">
+                    <li>Distribuerad crawling</li>
+                    <li>AI-driven innehållsanalys</li>
+                    <li>Automatisk lastbalansering</li>
+                    <li>24/7 Support</li>
+                    <li>Anpassad implementation</li>
+                </ul>
+                <a href="product2.html" class="product-cta">Läs mer</a>
+            </div>
+        </div>
+
+        <div class="product-card">
+            <div class="product-header">
+                <h2>Custom Solution</h2>
+                <div class="product-price">Kontakta oss</div>
+            </div>
+            <div class="product-content">
+                <ul class="feature-list">
+                    <li>Skräddarsydd lösning</li>
+                    <li>Dedikerad projektledning</li>
+                    <li>Anpassad utveckling</li>
+                    <li>Premium support</li>
+                    <li>Garanterad SLA</li>
+                </ul>
+                <a href="/contact.html" class="product-cta">Kontakta oss</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="comparison-section">
+        <h2 style="text-align: center; margin-bottom: 2rem;">Varför välja oss?</h2>
+        <div class="comparison-grid">
+            <div class="comparison-item">
+                <div style="font-size: 2.5rem; color: #2c5282;">⚡</div>
+                <h3>Snabbast</h3>
+                <p>Marknadsledande prestanda</p>
+            </div>
+            <div class="comparison-item">
+                <div style="font-size: 2.5rem; color: #2c5282;">🛡️</div>
+                <h3>Säkrast</h3>
+                <p>Enterprise-grade säkerhet</p>
+            </div>
+            <div class="comparison-item">
+                <div style="font-size: 2.5rem; color: #2c5282;">🎯</div>
+                <h3>Precision</h3>
+                <p>99.9% träffsäkerhet</p>
+            </div>
+            <div class="comparison-item">
+                <div style="font-size: 2.5rem; color: #2c5282;">🤝</div>
+                <h3>Support</h3>
+                <p>Dygnet runt-support</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 
