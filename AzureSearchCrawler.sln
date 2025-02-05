@@ -4,7 +4,7 @@ VisualStudioVersion = 17.12.35707.178 d17.12
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AzureSearchCrawler", "AzureSearchCrawler\AzureSearchCrawler.csproj", "{8BD6CCF3-572D-4FD1-BEC3-B7C54089C278}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AzureSearchCrawler.Tests", "AzureSearchCrawler.Tests.csproj\AzureSearchCrawler.Tests.csproj", "{1074CE24-8BC0-4F79-A949-8EB23301A758}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AzureSearchCrawler.Tests", "AzureSearchCrawler.Tests\AzureSearchCrawler.Tests.csproj", "{1074CE24-8BC0-4F79-A949-8EB23301A758}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
