@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace AzureSearchCrawler;
+﻿namespace AzureSearchCrawler;
 
 public class SystemConsoleAdapter : Interfaces.IConsole
 {

@@ -25,13 +25,13 @@
     <FileVersion>1.0.0.0</FileVersion>
     <StartupObject>AzureSearchCrawler.CrawlerMain</StartupObject>
     <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Abot" Version="2.0.70" />
     <PackageReference Include="AngleSharp" Version="1.2.0" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
     <PackageReference Include="Azure.Search.Documents" Version="11.6.0" />
-    <PackageReference Include="FluentCommandLineParser" Version="1.4.3" />
     <PackageReference Include="HtmlAgilityPack" Version="1.11.72" />
     <PackageReference Include="System.Net.Http" Version="4.3.4" />
     <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="9.0.0">

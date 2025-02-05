@@ -2,11 +2,7 @@ using Abot2.Poco;
 using Azure;
 using Azure.Search.Documents;
 using Azure.Search.Documents.Models;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using System.Threading;
 
 namespace AzureSearchCrawler
 {
