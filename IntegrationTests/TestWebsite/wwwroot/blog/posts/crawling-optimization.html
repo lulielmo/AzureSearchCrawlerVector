@@ -7,85 +7,125 @@
 </head>
 <body>
     <nav>
-        <a href="/">Home</a>
-        <a href="/about.html">About</a>
-        <a href="/contact.html">Contact</a>
-        <a href="/products/">Products</a>
-        <a href="/blog/">Blog</a>
+        <a href="/">Hem</a>
+        <a href="/about.html">Om oss</a>
+        <a href="/contact.html">Kontakt</a>
+        <a href="/products/">Produkter</a>
+        <a href="/blog/">Blogg</a>
     </nav>
 
-    <article>
+    <div class="post-hero">
         <h1>Optimering av Crawling</h1>
-        <div class="date">Publicerad: 2024-03-13</div>
-        
-        <div class="content">
-            <h2>Effektiv Crawling av Stora Webbplatser</h2>
-            <p>
-                Att crawla stora webbplatser effektivt kräver noggrann planering och 
-                optimering. Här delar vi med oss av viktiga tips och strategier för 
-                att förbättra crawling-processen.
-            </p>
-
-            <h2>Parallell Bearbetning</h2>
-            <p>
-                En av de viktigaste optimeringarna är att utnyttja parallell bearbetning:
-            </p>
-            <ul>
-                <li>Konfigurera rätt antal samtidiga trådar</li>
-                <li>Balansera belastningen på målservern</li>
-                <li>Hantera resurser effektivt</li>
-                <li>Implementera smart köhantering</li>
-            </ul>
-
-            <h2>Respektfull Crawling</h2>
-            <p>
-                Det är viktigt att vara en god "webbmedborgare" när man crawlar:
-            </p>
-            <ul>
-                <li>Följa robots.txt-direktiv</li>
-                <li>Implementera lämpliga crawl-delays</li>
-                <li>Respektera serverns kapacitet</li>
-                <li>Hantera rate-limiting korrekt</li>
-            </ul>
-
-            <h2>Minneshantering</h2>
-            <p>
-                För stora webbplatser är effektiv minneshantering avgörande:
-            </p>
-            <ul>
-                <li>Implementera streaming där möjligt</li>
-                <li>Rensa minnet regelbundet</li>
-                <li>Undvik minneläckor</li>
-                <li>Övervaka minnesanvändning</li>
-            </ul>
-
-            <h2>Smarta Crawling-strategier</h2>
-            <p>
-                Använd intelligenta strategier för att optimera crawling-processen:
-            </p>
-            <ul>
-                <li>Prioritera viktiga sidor</li>
-                <li>Implementera inkrementell crawling</li>
-                <li>Använd conditional GET-requests</li>
-                <li>Caching av redan besökta URLs</li>
-            </ul>
-
-            <h2>Övervakning och Loggning</h2>
-            <p>
-                God övervakning är nyckeln till optimering:
-            </p>
-            <ul>
-                <li>Spåra crawling-hastighet</li>
-                <li>Övervaka felfrekvens</li>
-                <li>Analysera prestandaflaskhalsar</li>
-                <li>Samla metriker för optimering</li>
-            </ul>
-
-            <p>
-                Med dessa optimeringar på plats kan din crawler hantera även 
-                mycket stora webbplatser på ett effektivt och resurssnålt sätt.
-            </p>
+        <div class="post-meta">
+            Publicerad 13 mars 2024 av Johan Lindberg
         </div>
-    </article>
+    </div>
+
+    <div class="blog-container">
+        <article class="post-container">
+            <div class="post-content">
+                <div class="tag-list">
+                    <span class="tag">Performance</span>
+                    <span class="tag">Optimization</span>
+                    <span class="tag">Best Practices</span>
+                    <span class="tag">Scaling</span>
+                </div>
+
+                <p>
+                    Att optimera din crawling-process är avgörande för att hantera 
+                    stora webbplatser effektivt. Här delar vi med oss av våra bästa 
+                    tips för att förbättra prestanda och skalbarhet.
+                </p>
+
+                <h2>Parallell Crawling</h2>
+                <div class="performance-tip">
+                    <strong>Prestandatips:</strong> Använd en worker pool för att 
+                    crawla flera sidor samtidigt, men var noga med att respektera 
+                    webbplatsens rate limits.
+                </div>
+
+                <div class="code-block">
+                    <pre>
+var options = new CrawlerOptions
+{
+    MaxConcurrency = 5,
+    DelayBetweenRequests = TimeSpan.FromMilliseconds(200)
+};
+
+await crawler.CrawlAsync(url, options);</pre>
+                </div>
+
+                <h2>Minnehantering</h2>
+                <ul>
+                    <li>Implementera inkrementell crawling</li>
+                    <li>Använd streaming för stora filer</li>
+                    <li>Rensa cachen regelbundet</li>
+                    <li>Övervaka minnesanvändningen</li>
+                </ul>
+
+                <div class="warning-tip">
+                    <strong>Varning:</strong> Var försiktig med att lagra för mycket 
+                    data i minnet. Implementera en caching-strategi som passar dina behov.
+                </div>
+
+                <h2>Nätverksoptimering</h2>
+                <p>
+                    För bästa nätverksprestanda:
+                </p>
+                <ul>
+                    <li>Använd HTTP/2 när möjligt</li>
+                    <li>Implementera retry-logik</li>
+                    <li>Hantera timeouts korrekt</li>
+                    <li>Använd connection pooling</li>
+                    <li>Komprimera data när möjligt</li>
+                </ul>
+
+                <h2>Skalning</h2>
+                <p>
+                    För att skala din crawler effektivt:
+                </p>
+                <ul>
+                    <li>Använd distribuerad crawling</li>
+                    <li>Implementera lastbalansering</li>
+                    <li>Använd message queues</li>
+                    <li>Övervaka systemets hälsa</li>
+                    <li>Automatisera skalning</li>
+                </ul>
+
+                <div class="post-navigation">
+                    <a href="/blog/" class="nav-link">← Tillbaka till bloggen</a>
+                    <a href="/blog/posts/testing-web-crawlers.html" class="nav-link">Nästa artikel →</a>
+                </div>
+            </div>
+        </article>
+
+        <aside class="blog-sidebar">
+            <div class="sidebar-section">
+                <h2>Andra artiklar</h2>
+                <ul style="list-style: none; padding: 0;">
+                    <li><a href="/blog/posts/testing-web-crawlers.html">Testa Webbcrawlers</a></li>
+                    <li><a href="/blog/posts/azure-search-integration.html">Azure Search Integration</a></li>
+                </ul>
+            </div>
+
+            <div class="sidebar-section">
+                <h2>Relaterade ämnen</h2>
+                <ul style="list-style: none; padding: 0;">
+                    <li><a href="#">Performance</a></li>
+                    <li><a href="#">Optimization</a></li>
+                    <li><a href="#">Best Practices</a></li>
+                </ul>
+            </div>
+
+            <div class="sidebar-section">
+                <h2>Resurser</h2>
+                <ul style="list-style: none; padding: 0;">
+                    <li><a href="/products/product1.html">Basic Crawler</a></li>
+                    <li><a href="/products/product2.html">Pro Crawler</a></li>
+                    <li><a href="/contact.html">Kontakta oss</a></li>
+                </ul>
+            </div>
+        </aside>
+    </div>
 </body>
 </html> 

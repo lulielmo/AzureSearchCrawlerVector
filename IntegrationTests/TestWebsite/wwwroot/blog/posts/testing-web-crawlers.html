@@ -2,48 +2,110 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Testning av Webbcrawlers - Blog</title>
+    <title>Testa Webbcrawlers - Blog</title>
     <link rel="stylesheet" href="/css/site.css">
 </head>
 <body>
     <nav>
-        <a href="/">Home</a>
-        <a href="/about.html">About</a>
-        <a href="/contact.html">Contact</a>
-        <a href="/products/">Products</a>
-        <a href="/blog/">Blog</a>
+        <a href="/">Hem</a>
+        <a href="/about.html">Om oss</a>
+        <a href="/contact.html">Kontakt</a>
+        <a href="/products/">Produkter</a>
+        <a href="/blog/">Blogg</a>
     </nav>
 
-    <article>
-        <h1>Testning av Webbcrawlers</h1>
-        <div class="date">Publicerad: 2024-03-15</div>
-        
-        <div class="content">
-            <h2>Introduktion</h2>
-            <p>
-                När man utvecklar en webbcrawler är det viktigt att ha en robust teststrategi. 
-                Detta inlägg går igenom olika aspekter av testning och hur man kan säkerställa 
-                kvaliteten på sin crawler.
-            </p>
-
-            <h2>Olika typer av tester</h2>
-            <p>
-                För en webbcrawler behöver vi testa flera olika aspekter:
-            </p>
-            <ul>
-                <li>Länkextrahering</li>
-                <li>Innehållsanalys</li>
-                <li>Felhantering</li>
-                <li>Prestandaoptimering</li>
-            </ul>
-
-            <h2>Testmiljö</h2>
-            <p>
-                En kontrollerad testmiljö är avgörande för att kunna reproducera olika scenarios. 
-                Denna webbplats är ett exempel på en sådan testmiljö, med olika typer av innehåll 
-                och strukturer som en crawler behöver hantera.
-            </p>
+    <div class="post-hero">
+        <h1>Testa Webbcrawlers</h1>
+        <div class="post-meta">
+            Publicerad 10 mars 2024 av Erik Eriksson
         </div>
-    </article>
+    </div>
+
+    <div class="blog-container">
+        <div class="blog-main">
+            <article class="post-container">
+                <div class="post-content">
+                    <div class="tag-list">
+                        <span class="tag">Testing</span>
+                        <span class="tag">Crawling</span>
+                        <span class="tag">Best Practices</span>
+                    </div>
+
+                    <p>
+                        Att testa webbcrawlers är en kritisk del av utvecklingsprocessen. 
+                        En vältestad crawler kan hantera olika scenarier och leverera 
+                        pålitliga resultat. I denna guide går vi igenom de viktigaste 
+                        aspekterna av crawler-testning.
+                    </p>
+
+                    <h2>Viktiga testområden</h2>
+                    <ul>
+                        <li>Korrekt följning av robots.txt</li>
+                        <li>Hantering av olika innehållstyper</li>
+                        <li>Prestanda under hög belastning</li>
+                        <li>Felhantering och återhämtning</li>
+                        <li>Respekt för rate limits</li>
+                    </ul>
+
+                    <h2>Exempel på testscenario</h2>
+                    <div class="code-block">
+                    <pre>
+[TestMethod]
+public async Task TestCrawler_FollowsRobotsTxt()
+{
+    var crawler = new WebCrawler();
+    var result = await crawler.CrawlAsync("https://example.com");
+    Assert.IsTrue(result.RespectsRobotsTxt);
+}</pre>
+                    </div>
+
+                    <h2>Bästa praxis</h2>
+                    <p>
+                        När du testar din crawler, se till att:
+                    </p>
+                    <ul>
+                        <li>Använd en dedikerad testmiljö</li>
+                        <li>Simulera olika nätverksförhållanden</li>
+                        <li>Testa med olika storlekar på webbplatser</li>
+                        <li>Validera datakvaliteten</li>
+                        <li>Mät och optimera prestanda</li>
+                    </ul>
+
+                    <div class="post-navigation">
+                        <a href="/blog/" class="nav-link">← Tillbaka till bloggen</a>
+                        <a href="/contact.html" class="nav-link">Kontakta oss →</a>
+                    </div>
+                </div>
+            </article>
+        </div>
+
+        <aside class="blog-sidebar">
+            <div class="sidebar-section">
+                <h2>Andra artiklar</h2>
+                <ul style="list-style: none; padding: 0;">
+                    <li><a href="/blog/posts/crawling-optimization.html">Optimering av Crawling</a></li>
+                    <li><a href="/blog/posts/azure-search-integration.html">Azure Search Integration</a></li>
+                </ul>
+            </div>
+
+            <div class="sidebar-section">
+                <h2>Relaterade ämnen</h2>
+                <ul style="list-style: none; padding: 0;">
+                    <li><a href="#">Testing</a></li>
+                    <li><a href="#">Crawling</a></li>
+                    <li><a href="#">Best Practices</a></li>
+                </ul>
+            </div>
+
+            <div class="sidebar-section">
+                <h2>Resurser</h2>
+                <ul style="list-style: none; padding: 0;">
+                    <li><a href="/products/product1.html">Basic Crawler</a></li>
+                    <li><a href="/products/product2.html">Pro Crawler</a></li>
+                    <li><a href="/contact.html">Kontakta oss</a></li>
+                </ul>
+            </div>
+        </aside>
+    </div>
 </body>
 </html> 
