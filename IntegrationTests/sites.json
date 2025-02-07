@@ -1,0 +1,10 @@
+[
+    {
+      "uri": "http://localhost:5141/",
+      "maxDepth": 3
+    },
+    {
+      "uri": "http://localhost:5142/",
+      "maxDepth": 5
+    }
+  ]
