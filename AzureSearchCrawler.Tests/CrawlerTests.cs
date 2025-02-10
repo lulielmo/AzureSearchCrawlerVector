@@ -551,8 +551,7 @@ namespace AzureSearchCrawler.Tests
                 true,
                 new TextExtractor(),
                 false,
-                testConsole,
-                "div.blog-content");
+                testConsole);
 
             // Skapa test HTML
             var htmlContent = @"
@@ -599,18 +598,23 @@ namespace AzureSearchCrawler.Tests
                     CrawlContext = new CrawlContext()
                 });
 
+            //var crawler = new Crawler(indexer, _webCrawlerMock.Object, testConsole);
             var crawler = new Crawler(indexer, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
             }, testConsole);
-
+            
             // Act
-            await crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1);
+            await crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1, domSelector: "div.blog-content");
 
             // Assert
-            var output = string.Join(Environment.NewLine, testConsole.Output);
-            Assert.Contains("Skipping", output);
+            Assert.NotNull(linkDecisionMaker);
+            var goodDecision = linkDecisionMaker(new Uri(uri, "/blog/posts/good-link.html"), crawledPage, new CrawlContext());
+            var badDecision = linkDecisionMaker(new Uri(uri, "/blog/posts/bad-link.html"), crawledPage, new CrawlContext());
+            
+            Assert.True(goodDecision, "Good link should be allowed");
+            Assert.False(badDecision, "Bad link should be filtered out");
         }
 
         private static CrawlConfiguration? _lastConfig;  // För att fånga konfigurationen

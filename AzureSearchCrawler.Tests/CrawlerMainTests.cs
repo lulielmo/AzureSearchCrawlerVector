@@ -24,15 +24,15 @@ namespace AzureSearchCrawler.Tests
             Console.SetOut(_consoleOutput);
             Console.SetError(_consoleError);
 
-            // Använder den riktiga AzureSearchIndexer men med dryRun=true
+            // Uppdatera konstruktorn utan domSelector
             _crawlerMain = new CrawlerMain(
-                (endpoint, index, key, extract, extractor, dryRun, console, domSelector) =>
-                    new AzureSearchIndexer(endpoint, index, key, extract, extractor, dryRun, console, domSelector),
+                (endpoint, index, key, extract, extractor, dryRun, console) =>
+                    new AzureSearchIndexer(endpoint, index, key, extract, extractor, dryRun, console),
                 (indexer) => _crawlerMock.Object);
 
-            // Setup mock behavior
+            // Uppdatera mock setup med domSelector parameter
             _crawlerMock
-                .Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>()))
+                .Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>()))
                 .Returns(Task.CompletedTask);
         }
 
@@ -117,7 +117,7 @@ namespace AzureSearchCrawler.Tests
 
             // Assert
             Assert.Equal(1, result);
-            Assert.Contains("Invalid root URI format: ht tp://invalid.com", string.Join(Environment.NewLine, testConsole.Errors));
+            Assert.Contains("Invalid root URI format: ht tp://invalid.", string.Join(Environment.NewLine, testConsole.Errors));
         }
 
         [Fact]
@@ -163,7 +163,8 @@ namespace AzureSearchCrawler.Tests
             _crawlerMock.Verify(c => c.CrawlAsync(
                 It.IsAny<Uri>(),
                 It.Is<int>(p => p == 50),
-                It.Is<int>(d => d == 3)),
+                It.Is<int>(d => d == 3),
+                It.IsAny<string?>()),
                 Times.Once);
         }
 
@@ -174,8 +175,8 @@ namespace AzureSearchCrawler.Tests
             var testConsole = new TestConsole();
             var tempFile = Path.GetTempFileName();
             await File.WriteAllTextAsync(tempFile, @"[
-                {""uri"": ""http://example.com"", ""maxDepth"": 3},
-                {""uri"": ""http://another-site.com"", ""maxDepth"": 5}
+                {""uri"": ""http://example.com"", ""maxDepth"": 3, ""domSelector"": ""div.blog-content""},
+                {""uri"": ""http://another-site.com"", ""maxDepth"": 5, ""domSelector"": ""div.articles""}
             ]");
 
             var args = new[]
@@ -196,12 +197,14 @@ namespace AzureSearchCrawler.Tests
                 _crawlerMock.Verify(c => c.CrawlAsync(
                     It.Is<Uri>(u => u.Host == "example.com"),
                     It.IsAny<int>(),
-                    It.Is<int>(d => d == 3)),
+                    It.Is<int>(d => d == 3),
+                    It.Is<string>(s => s == "div.blog-content")),
                     Times.Once);
                 _crawlerMock.Verify(c => c.CrawlAsync(
                     It.Is<Uri>(u => u.Host == "another-site.com"),
                     It.IsAny<int>(),
-                    It.Is<int>(d => d == 5)),
+                    It.Is<int>(d => d == 5),
+                    It.Is<string>(s => s == "div.articles")),
                     Times.Once);
             }
             finally
@@ -240,7 +243,8 @@ namespace AzureSearchCrawler.Tests
                 _crawlerMock.Verify(c => c.CrawlAsync(
                     It.Is<Uri>(u => u.Host == "valid-site.com"),
                     It.IsAny<int>(),
-                    It.Is<int>(d => d == 5)),
+                    It.Is<int>(d => d == 5),
+                    It.IsAny<string?>()),
                     Times.Once);
             }
             finally
@@ -293,7 +297,6 @@ namespace AzureSearchCrawler.Tests
 
                 // Assert
                 Assert.Equal(1, result);
-                //Error parsing sites file:
                 Assert.Contains("Error parsing sites file:", string.Join(Environment.NewLine, testConsole.Errors));
             }
             finally
@@ -359,7 +362,7 @@ namespace AzureSearchCrawler.Tests
             // Arrange
             var testConsole = new TestConsole();
             _crawlerMock
-                .Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>()))
+                .Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>()))
                 .ThrowsAsync(new InvalidOperationException("Unexpected error"));
 
             var args = new[]
@@ -376,6 +379,96 @@ namespace AzureSearchCrawler.Tests
             // Assert
             Assert.Equal(1, result);
             Assert.Contains("Error: Unexpected error", testConsole.Errors);
+        }
+
+        [Fact]
+        public async Task RunAsync_WithDomSelector_PassesSelectorToCrawler()
+        {
+            // Arrange
+            var args = new[]
+            {
+                "--rootUri", "http://example.com",
+                "--serviceEndPoint", "https://test.search.windows.net",
+                "--indexName", "test-index",
+                "--adminApiKey", "test-key",
+                "--domSelector", "div.blog-content"
+            };
+
+            // Act
+            var result = await _crawlerMain.RunAsync(args, new TestConsole());
+
+            // Assert
+            Assert.Equal(0, result);
+            _crawlerMock.Verify(c => c.CrawlAsync(
+                It.IsAny<Uri>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.Is<string>(s => s == "div.blog-content")),
+                Times.Once);
+        }
+
+        [Fact]
+        public async Task RunAsync_WithoutDomSelector_PassesNullSelector()
+        {
+            // Arrange
+            var args = new[]
+            {
+                "--rootUri", "http://example.com",
+                "--serviceEndPoint", "https://test.search.windows.net",
+                "--indexName", "test-index",
+                "--adminApiKey", "test-key"
+            };
+
+            // Act
+            var result = await _crawlerMain.RunAsync(args, new TestConsole());
+
+            // Assert
+            Assert.Equal(0, result);
+            _crawlerMock.Verify(c => c.CrawlAsync(
+                It.IsAny<Uri>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.Is<string?>(s => s == null)),
+                Times.Once);
+        }
+
+        [Fact]
+        public async Task RunAsync_WithSitesFileWithoutDomSelector_PassesNullSelector()
+        {
+            // Arrange
+            var testConsole = new TestConsole();
+            var tempFile = Path.GetTempFileName();
+            await File.WriteAllTextAsync(tempFile, @"[
+                {""uri"": ""http://example.com"", ""maxDepth"": 3},
+                {""uri"": ""http://another-site.com"", ""maxDepth"": 5}
+            ]");
+
+            var args = new[]
+            {
+                "--sitesFile", tempFile,
+                "--serviceEndPoint", "https://test.search.windows.net",
+                "--indexName", "test-index",
+                "--adminApiKey", "test-key"
+            };
+
+            try
+            {
+                // Act
+                var result = await _crawlerMain.RunAsync(args, testConsole);
+
+                // Assert
+                Assert.Equal(0, result);
+                _crawlerMock.Verify(c => c.CrawlAsync(
+                    It.IsAny<Uri>(),
+                    It.IsAny<int>(),
+                    It.IsAny<int>(),
+                    It.Is<string?>(s => s == null)),
+                    Times.Exactly(2));
+            }
+            finally
+            {
+                File.Delete(tempFile);
+            }
         }
     }
 }

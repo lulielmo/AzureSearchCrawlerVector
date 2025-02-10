@@ -19,22 +19,22 @@ namespace AzureSearchCrawler
         private static int PageCount = 0;
 
         private readonly CrawlHandler _handler;
-        private readonly Func<CrawlConfiguration, IWebCrawler> _crawlerFactory;
-        private readonly IConsole _console;
+        private readonly Func<CrawlConfiguration, IWebCrawler> _webCrawlerFactory;
+        private readonly Interfaces.IConsole _console;
 
-        public Crawler(CrawlHandler handler, IConsole console)
+        public Crawler(CrawlHandler handler, Interfaces.IConsole console)
             : this(handler, config => new PoliteWebCrawler(config), console)
         {
         }
 
-        public Crawler(CrawlHandler handler, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, IConsole console)
+        public Crawler(CrawlHandler handler, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, Interfaces.IConsole console)
         {
             _handler = handler ?? throw new ArgumentNullException(nameof(handler));
-            _crawlerFactory = crawlerFactory ?? throw new ArgumentNullException(nameof(crawlerFactory));
+            _webCrawlerFactory = crawlerFactory ?? throw new ArgumentNullException(nameof(crawlerFactory));
             _console = console ?? throw new ArgumentNullException(nameof(console));
         }
 
-        public async Task CrawlAsync(Uri rootUri, int maxPages, int maxDepth)
+        public async Task CrawlAsync(Uri rootUri, int maxPages, int maxDepth, string? domSelector = null)
         {
             PageCount = 0;
 
@@ -45,29 +45,28 @@ namespace AzureSearchCrawler
                 throw new ArgumentException("maxDepth must be greater than 0", nameof(maxDepth));
 
             var config = CreateCrawlConfiguration(maxPages, maxDepth);
-            IWebCrawler crawler = _crawlerFactory(config);
+            IWebCrawler crawler = _webCrawlerFactory(config);
 
+            //var crawler = _webCrawlerFactory(config);
             crawler.PageCrawlStarting += (sender, args) => crawler_ProcessPageCrawlStarting(sender!, args);
             crawler.PageCrawlCompleted += (sender, args) => crawler_ProcessPageCrawlCompleted(sender!, args);
             
-            // Lägg till händelsehanterare för länkfiltrering
-            var indexer = _handler as AzureSearchIndexer;
-            if (indexer?.DomSelector != null)
+            if (domSelector != null)
             {
                 crawler.ShouldScheduleLinkDecisionMaker = (uri, crawledPage, crawlContext) =>
                 {
                     if (crawledPage.AngleSharpHtmlDocument == null)
                         return true;
 
-                    _console.WriteLine($"Checking {uri.AbsoluteUri} against selector '{indexer.DomSelector}'");
+                    _console.WriteLine($"Checking {uri.AbsoluteUri} against selector '{domSelector}'");
                     var links = crawledPage.AngleSharpHtmlDocument
-                        .QuerySelectorAll($"{indexer.DomSelector} a")
-                        .Where(a => a.OuterHtml.Contains(uri.LocalPath)); // Kan tyvärr inte nyttja href (knasigt värde), eller PathName (oåtkomlig)
+                        .QuerySelectorAll($"{domSelector} a")
+                        .Where(a => a.OuterHtml.Contains(uri.LocalPath));
 
                     var shouldCrawl = links.Any();
                     if (!shouldCrawl)
                     {
-                        _console.WriteLine($"Skipping {uri.AbsoluteUri} - not found within {indexer.DomSelector}");
+                        _console.WriteLine($"Skipping {uri.AbsoluteUri} - not found within {domSelector}");
                     }
                     
                     return shouldCrawl;

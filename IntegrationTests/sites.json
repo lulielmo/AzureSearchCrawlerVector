@@ -1,7 +1,8 @@
 [
     {
-      "uri": "http://localhost:5141/",
-      "maxDepth": 3
+      "uri": "http://localhost:5141/blog",
+      "maxDepth": 3,
+      "domSelector": "div.blog-content"
     },
     {
       "uri": "http://localhost:5142/",

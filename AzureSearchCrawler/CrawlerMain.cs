@@ -15,15 +15,15 @@ namespace AzureSearchCrawler
     {
         private const int DefaultMaxPagesToIndex = 100;
         private const int DefaultMaxCrawlDepth = 10;
-        private readonly Func<string, string, string, bool, TextExtractor, bool, Interfaces.IConsole, string?, AzureSearchIndexer> _indexerFactory;
+        private readonly Func<string, string, string, bool, TextExtractor, bool, Interfaces.IConsole, AzureSearchIndexer> _indexerFactory;
         private readonly Func<AzureSearchIndexer, ICrawler> _crawlerFactory;
 
         public CrawlerMain(
-            Func<string, string, string, bool, TextExtractor, bool, Interfaces.IConsole, string?, AzureSearchIndexer>? indexerFactory = null,
+            Func<string, string, string, bool, TextExtractor, bool, Interfaces.IConsole, AzureSearchIndexer>? indexerFactory = null,
             Func<AzureSearchIndexer, ICrawler>? crawlerFactory = null)
         {
-            _indexerFactory = indexerFactory ?? ((endpoint, index, key, extract, extractor, dryRun, console, domSelector) =>
-                new AzureSearchIndexer(endpoint, index, key, extract, extractor, dryRun, console, domSelector));
+            _indexerFactory = indexerFactory ?? ((endpoint, index, key, extract, extractor, dryRun, console) =>
+                new AzureSearchIndexer(endpoint, index, key, extract, extractor, dryRun, console));
             _crawlerFactory = crawlerFactory ?? (indexer => new Crawler(indexer, new SystemConsoleAdapter(new SystemConsole())));
         }
 
@@ -128,8 +128,14 @@ namespace AzureSearchCrawler
                         return;
                     }
 
-                    var indexer = _indexerFactory(serviceEndPoint, indexName!, adminApiKey!, extractText,
-                        new TextExtractor(), dryRun, new SystemConsoleAdapter(console), domSelector);
+                    var indexer = _indexerFactory(
+                            serviceEndPoint, 
+                            indexName!, 
+                            adminApiKey!, 
+                            extractText,
+                            new TextExtractor(), 
+                            dryRun, 
+                            new SystemConsoleAdapter(console));
                     var crawler = _crawlerFactory(indexer);
 
                     if (sitesFile != null)
@@ -146,7 +152,7 @@ namespace AzureSearchCrawler
                             var sites = JsonSerializer.Deserialize<List<SiteConfig>>(
                                 await File.ReadAllTextAsync(sitesFile.FullName),
                                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-                            );
+                            ) ?? throw new InvalidOperationException("Failed to deserialize sites file");
 
                             if (sites == null || sites.Count == 0)
                             {
@@ -163,8 +169,8 @@ namespace AzureSearchCrawler
                                     continue;
                                 }
 
-                                console.WriteLine($"Crawling {site.Uri} with depth {site.MaxDepth}...");
-                                await crawler.CrawlAsync(uri, maxPages, site.MaxDepth);
+                                console.WriteLine($"Crawling {site.Uri} with depth {site.MaxDepth} ({site.DomSelector})...");
+                                await crawler.CrawlAsync(new Uri(site.Uri), maxPages, site.MaxDepth, site.DomSelector);
                             }
                         }
                         catch (JsonException ex)
@@ -180,9 +186,11 @@ namespace AzureSearchCrawler
                         exitCode = 1;
                         return;
                     }
+                    //else if (rootUri != null)
                     else
                     {
-                        await crawler.CrawlAsync(uri, maxPages, maxDepth);
+                        console.WriteLine($"Crawling {rootUri} with depth {maxDepth} ({domSelector})...");
+                        await crawler.CrawlAsync(new Uri(rootUri), maxPages, maxDepth, domSelector);
                     }
                 }
                 catch (Exception ex)

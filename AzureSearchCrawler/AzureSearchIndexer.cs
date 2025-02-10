@@ -22,13 +22,10 @@ namespace AzureSearchCrawler
         private readonly TextExtractor _textExtractor;
         private readonly bool _dryRun;
         private readonly Interfaces.IConsole _console;
-        private readonly string? _domSelector;
         private SearchClient? _searchClient;
 
         private readonly BlockingCollection<WebPage> _queue = [];
         private readonly SemaphoreSlim indexingLock = new(1, 1);
-
-        public string? DomSelector => _domSelector;
 
         public AzureSearchIndexer(
             string searchServiceEndpoint,
@@ -37,8 +34,7 @@ namespace AzureSearchCrawler
             bool extractText,
             TextExtractor textExtractor,
             bool dryRun,
-            Interfaces.IConsole console,
-            string? domSelector = null)
+            Interfaces.IConsole console)
         {
             if (string.IsNullOrWhiteSpace(searchServiceEndpoint))
                 throw new ArgumentException("Value cannot be null or empty.", nameof(searchServiceEndpoint));
@@ -55,7 +51,6 @@ namespace AzureSearchCrawler
             _textExtractor = textExtractor;
             _dryRun = dryRun;
             _console = console ?? throw new ArgumentNullException(nameof(console));
-            _domSelector = domSelector;
 
             if (!dryRun)
             {
