@@ -50,8 +50,9 @@ By using the command line switch `-f, --sitesFile <sitesFile>` you can specify a
 ```json
 [
   {
-    "uri": "https://example.com",
-    "maxDepth": 3
+    "uri": "https://example.com/blog",
+    "maxDepth": 3,
+    "domSelector": "div.blog-content"
   },
   {
     "uri": "https://another-site.com",
