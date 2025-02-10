@@ -37,7 +37,7 @@ Options:
                                                       True]
   -dr, --dryRun                                       Test crawling without uploading to index [default: False]
   -f, --sitesFile <sitesFile>                         Path to a JSON file containing sites to crawl
-  -ds, --domSelector <sitesFile>                      DOM selector to limit which links to follow (e.g.
+  -ds, --domSelector <domSelector>                    DOM selector to limit which links to follow (e.g.
                                                       'div.blog-container div.blog-main')
   --version                                           Show version information
   -?, -h, --help                                      Show help and usage information
