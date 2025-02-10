@@ -2,7 +2,7 @@ using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
 using System.CommandLine;
 using System.CommandLine.Invocation;
-using System.CommandLine.IO;  // För SystemConsole
+using System.CommandLine.IO;  // FÃ¶r SystemConsole
 using System.CommandLine.Parsing;
 using System.Text.Json;
 
@@ -15,17 +15,16 @@ namespace AzureSearchCrawler
     {
         private const int DefaultMaxPagesToIndex = 100;
         private const int DefaultMaxCrawlDepth = 10;
-        private readonly Func<string, string, string, bool, TextExtractor, bool, AzureSearchIndexer> _indexerFactory;
+        private readonly Func<string, string, string, bool, TextExtractor, bool, Interfaces.IConsole, string?, AzureSearchIndexer> _indexerFactory;
         private readonly Func<AzureSearchIndexer, ICrawler> _crawlerFactory;
 
         public CrawlerMain(
-            Func<string, string, string, bool, TextExtractor, bool, AzureSearchIndexer>? indexerFactory = null,
+            Func<string, string, string, bool, TextExtractor, bool, Interfaces.IConsole, string?, AzureSearchIndexer>? indexerFactory = null,
             Func<AzureSearchIndexer, ICrawler>? crawlerFactory = null)
         {
-            _indexerFactory = indexerFactory ?? ((endpoint, index, key, extract, extractor, dryRun) =>
-                new AzureSearchIndexer(endpoint, index, key, extract, extractor, dryRun, new SystemConsoleAdapter(new SystemConsole())));
-            _crawlerFactory = crawlerFactory ?? (Func<AzureSearchIndexer, ICrawler>)((indexer) =>
-                new Crawler(indexer, new SystemConsoleAdapter(new SystemConsole())));
+            _indexerFactory = indexerFactory ?? ((endpoint, index, key, extract, extractor, dryRun, console, domSelector) =>
+                new AzureSearchIndexer(endpoint, index, key, extract, extractor, dryRun, console, domSelector));
+            _crawlerFactory = crawlerFactory ?? (indexer => new Crawler(indexer, new SystemConsoleAdapter(new SystemConsole())));
         }
 
         // Entry point
@@ -35,7 +34,7 @@ namespace AzureSearchCrawler
             return await crawlerMain.RunAsync(args, new SystemConsole());
         }
 
-        // Flyttad till en egen metod för testbarhet
+        // Flyttad till en egen metod fÃ¶r testbarhet
         public async Task<int> RunAsync(string[] args, System.CommandLine.IConsole console)
         {
             var rootUriOption = new Option<string>(
@@ -81,6 +80,10 @@ namespace AzureSearchCrawler
                 aliases: new[] { "--sitesFile", "-f" },
                 description: "Path to a JSON file containing sites to crawl");
 
+            var domSelectorOption = new Option<string>(
+                aliases: new[] { "--domSelector", "-ds" },
+                description: "DOM selector to limit which links to follow (e.g. 'div.blog-container div.blog-main')");
+
             var rootCommand = new RootCommand("Web crawler that indexes content in Azure Search.")
             {
                 rootUriOption,
@@ -91,7 +94,8 @@ namespace AzureSearchCrawler
                 adminApiKeyOption,
                 extractTextOption,
                 dryRunOption,
-                sitesFileOption
+                sitesFileOption,
+                domSelectorOption
             };
 
             int exitCode = 0;
@@ -108,6 +112,7 @@ namespace AzureSearchCrawler
                     var extractText = context.ParseResult.GetValueForOption(extractTextOption);
                     var dryRun = context.ParseResult.GetValueForOption(dryRunOption);
                     var sitesFile = context.ParseResult.GetValueForOption(sitesFileOption);
+                    var domSelector = context.ParseResult.GetValueForOption(domSelectorOption);
 
                     if (rootUri == null && sitesFile == null)
                     {
@@ -124,7 +129,7 @@ namespace AzureSearchCrawler
                     }
 
                     var indexer = _indexerFactory(serviceEndPoint, indexName!, adminApiKey!, extractText,
-                        new TextExtractor(), dryRun);
+                        new TextExtractor(), dryRun, new SystemConsoleAdapter(console), domSelector);
                     var crawler = _crawlerFactory(indexer);
 
                     if (sitesFile != null)

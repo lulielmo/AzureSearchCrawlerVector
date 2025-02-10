@@ -2,6 +2,8 @@
 using Abot2.Poco;
 using Moq;
 using Xunit;
+using AngleSharp.Html.Parser;
+using AngleSharp;
 
 namespace AzureSearchCrawler.Tests
 {
@@ -534,6 +536,81 @@ namespace AzureSearchCrawler.Tests
             // Assert
             var output = string.Join(Environment.NewLine, testConsole.Output);
             Assert.Contains("found on", output);
+        }
+
+        [Fact]
+        public async Task CrawlAsync_WithDomSelector_FiltersLinks()
+        {
+            // Arrange
+            var uri = new Uri("http://example.com");
+            var testConsole = new TestConsole();
+            var indexer = new AzureSearchIndexer(
+                "https://test.search.windows.net",
+                "test-index",
+                "test-key",
+                true,
+                new TextExtractor(),
+                false,
+                testConsole,
+                "div.blog-content");
+
+            // Skapa test HTML
+            var htmlContent = @"
+                <html>
+                    <body>
+                        <div class='blog-content'>
+                            <a href='/blog/posts/good-link.html'>Good Link</a>
+                        </div>
+                        <div class='other-content'>
+                            <a href='/blog/posts/bad-link.html'>Bad Link</a>
+                        </div>
+                    </body>
+                </html>";
+
+            // Skapa AngleSharp dokument
+            var context = BrowsingContext.New();
+            var document = await context.OpenAsync(req => req.Content(htmlContent));
+
+            var crawledPage = new CrawledPage(uri)
+            {
+                Content = new PageContent { Text = htmlContent }
+            };
+
+            Func<Uri, CrawledPage, CrawlContext, bool>? linkDecisionMaker = null;
+            _webCrawlerMock.SetupSet(c => c.ShouldScheduleLinkDecisionMaker = It.IsAny<Func<Uri, CrawledPage, CrawlContext, bool>>())
+                .Callback<Func<Uri, CrawledPage, CrawlContext, bool>>(func => linkDecisionMaker = func);
+
+            _webCrawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>()))
+                .Callback(() => 
+                {
+                    var goodLink = new Uri(uri, "/blog/posts/good-link.html");
+                    var badLink = new Uri(uri, "/blog/posts/bad-link.html");
+                    
+                    Assert.NotNull(linkDecisionMaker);
+                    var goodDecision = linkDecisionMaker(goodLink, crawledPage, new CrawlContext());
+                    var badDecision = linkDecisionMaker(badLink, crawledPage, new CrawlContext());
+                    
+                    Assert.True(goodDecision, "Good link should be allowed");
+                    Assert.False(badDecision, "Bad link should be filtered out");
+                })
+                .ReturnsAsync(new CrawlResult 
+                { 
+                    RootUri = uri,
+                    CrawlContext = new CrawlContext()
+                });
+
+            var crawler = new Crawler(indexer, config =>
+            {
+                _lastConfig = config;
+                return _webCrawlerMock.Object;
+            }, testConsole);
+
+            // Act
+            await crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1);
+
+            // Assert
+            var output = string.Join(Environment.NewLine, testConsole.Output);
+            Assert.Contains("Skipping", output);
         }
 
         private static CrawlConfiguration? _lastConfig;  // För att fånga konfigurationen

@@ -26,8 +26,8 @@ namespace AzureSearchCrawler.Tests
 
             // Använder den riktiga AzureSearchIndexer men med dryRun=true
             _crawlerMain = new CrawlerMain(
-                (endpoint, index, key, extract, extractor, dryRun) =>
-                    new AzureSearchIndexer(endpoint, index, key, extract, extractor, dryRun, new TestConsole()),
+                (endpoint, index, key, extract, extractor, dryRun, console, domSelector) =>
+                    new AzureSearchIndexer(endpoint, index, key, extract, extractor, dryRun, console, domSelector),
                 (indexer) => _crawlerMock.Object);
 
             // Setup mock behavior

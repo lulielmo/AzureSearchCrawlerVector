@@ -5,6 +5,8 @@ using System;
 using System.Net;
 using System.Threading.Tasks;
 using System.Threading;
+using System.Linq;
+using AngleSharp.Dom;
 
 namespace AzureSearchCrawler
 {
@@ -47,6 +49,30 @@ namespace AzureSearchCrawler
 
             crawler.PageCrawlStarting += (sender, args) => crawler_ProcessPageCrawlStarting(sender!, args);
             crawler.PageCrawlCompleted += (sender, args) => crawler_ProcessPageCrawlCompleted(sender!, args);
+            
+            // Lägg till händelsehanterare för länkfiltrering
+            var indexer = _handler as AzureSearchIndexer;
+            if (indexer?.DomSelector != null)
+            {
+                crawler.ShouldScheduleLinkDecisionMaker = (uri, crawledPage, crawlContext) =>
+                {
+                    if (crawledPage.AngleSharpHtmlDocument == null)
+                        return true;
+
+                    _console.WriteLine($"Checking {uri.AbsoluteUri} against selector '{indexer.DomSelector}'");
+                    var links = crawledPage.AngleSharpHtmlDocument
+                        .QuerySelectorAll($"{indexer.DomSelector} a")
+                        .Where(a => a.OuterHtml.Contains(uri.LocalPath)); // Kan tyvärr inte nyttja href (knasigt värde), eller PathName (oåtkomlig)
+
+                    var shouldCrawl = links.Any();
+                    if (!shouldCrawl)
+                    {
+                        _console.WriteLine($"Skipping {uri.AbsoluteUri} - not found within {indexer.DomSelector}");
+                    }
+                    
+                    return shouldCrawl;
+                };
+            }
 
             try
             {

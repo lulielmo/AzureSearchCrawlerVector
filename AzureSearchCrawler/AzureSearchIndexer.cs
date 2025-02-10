@@ -22,10 +22,13 @@ namespace AzureSearchCrawler
         private readonly TextExtractor _textExtractor;
         private readonly bool _dryRun;
         private readonly Interfaces.IConsole _console;
+        private readonly string? _domSelector;
         private SearchClient? _searchClient;
 
         private readonly BlockingCollection<WebPage> _queue = [];
         private readonly SemaphoreSlim indexingLock = new(1, 1);
+
+        public string? DomSelector => _domSelector;
 
         public AzureSearchIndexer(
             string searchServiceEndpoint,
@@ -34,7 +37,8 @@ namespace AzureSearchCrawler
             bool extractText,
             TextExtractor textExtractor,
             bool dryRun,
-            Interfaces.IConsole console)
+            Interfaces.IConsole console,
+            string? domSelector = null)
         {
             if (string.IsNullOrWhiteSpace(searchServiceEndpoint))
                 throw new ArgumentException("Value cannot be null or empty.", nameof(searchServiceEndpoint));
@@ -51,6 +55,7 @@ namespace AzureSearchCrawler
             _textExtractor = textExtractor;
             _dryRun = dryRun;
             _console = console ?? throw new ArgumentNullException(nameof(console));
+            _domSelector = domSelector;
 
             if (!dryRun)
             {
@@ -153,7 +158,7 @@ namespace AzureSearchCrawler
                 catch (Exception ex)
                 {
                     _console.WriteLine($"Error indexing batch: {ex.Message}");
-                    // Lägg tillbaka sidorna i kön
+                    // Lï¿½gg tillbaka sidorna i kï¿½n
                     foreach (var page in pages)
                     {
                         _queue.Add(page);
@@ -178,7 +183,7 @@ namespace AzureSearchCrawler
                 };
             }
 
-            // TextExtractor garanterar att både 'title' och 'content' finns i resultatet
+            // TextExtractor garanterar att bï¿½de 'title' och 'content' finns i resultatet
             return _textExtractor.ExtractText(_extractText, crawledPage.Content.Text);
         }
 
