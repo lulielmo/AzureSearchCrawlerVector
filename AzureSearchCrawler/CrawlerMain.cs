@@ -15,15 +15,15 @@ namespace AzureSearchCrawler
     {
         private const int DefaultMaxPagesToIndex = 100;
         private const int DefaultMaxCrawlDepth = 10;
-        private readonly Func<string, string, string, bool, TextExtractor, bool, Interfaces.IConsole, AzureSearchIndexer> _indexerFactory;
+        private readonly Func<string, string, string, string, string, string, int, bool, TextExtractor, bool, Interfaces.IConsole, AzureSearchIndexer> _indexerFactory;
         private readonly Func<AzureSearchIndexer, ICrawler> _crawlerFactory;
 
         public CrawlerMain(
-            Func<string, string, string, bool, TextExtractor, bool, Interfaces.IConsole, AzureSearchIndexer>? indexerFactory = null,
+            Func<string, string, string, string, string, string, int, bool, TextExtractor, bool, Interfaces.IConsole, AzureSearchIndexer>? indexerFactory = null,
             Func<AzureSearchIndexer, ICrawler>? crawlerFactory = null)
         {
-            _indexerFactory = indexerFactory ?? ((endpoint, index, key, extract, extractor, dryRun, console) =>
-                new AzureSearchIndexer(endpoint, index, key, extract, extractor, dryRun, console));
+            _indexerFactory = indexerFactory ?? ((endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, azureOpenAIEmbeddingDimensions, extract, extractor, dryRun, console) =>
+                new AzureSearchIndexer(endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, azureOpenAIEmbeddingDimensions, extract, extractor, dryRun, console));
             _crawlerFactory = crawlerFactory ?? (indexer => new Crawler(indexer, new SystemConsoleAdapter(new SystemConsole())));
         }
 
@@ -37,9 +37,11 @@ namespace AzureSearchCrawler
         // Flyttad till en egen metod för testbarhet
         public async Task<int> RunAsync(string[] args, System.CommandLine.IConsole console)
         {
+            #region Site options
             var rootUriOption = new Option<string>(
                 aliases: new[] { "--rootUri", "-r" },
                 description: "Root URI to start crawling from");
+
 
             var maxPagesOption = new Option<int>(
                 aliases: new[] { "--maxPages", "-m" },
@@ -50,7 +52,9 @@ namespace AzureSearchCrawler
                 aliases: new[] { "--maxDepth", "-d" },
                 getDefaultValue: () => DefaultMaxCrawlDepth,
                 description: "Maximum crawl depth");
+            #endregion
 
+            #region Search service options
             var serviceEndPointOption = new Option<string>(
                 aliases: new[] { "--serviceEndPoint", "-s" },
                 description: "Azure Search service endpoint")
@@ -65,7 +69,33 @@ namespace AzureSearchCrawler
                 aliases: new[] { "--adminApiKey", "-a" },
                 description: "Admin API key for Azure Search")
             { IsRequired = true };
+            #endregion
 
+            #region Embedding service options
+
+            var embeddingAiEndpointOption = new Option<string>(
+                aliases: new[] { "--embeddingEndPoint", "-ee" },
+                description: "The Url (service end point) of your Azure AI Embedding service")
+            { IsRequired = true };
+
+            var embeddingAiAdminKeyOption = new Option<string>(
+                aliases: new[] { "--embeddingAdminKey", "-ek" },
+                description: "The admin key for your Azure AI Embedding service")
+            { IsRequired = true };
+
+            var embeddingAiDeploymentNameOption = new Option<string>(
+                aliases: new[] { "--embeddingDeploymentName", "-ed" },
+                description: "The name of the deployment for your Azure AI Embedding service")
+            { IsRequired = true };
+
+            var azureOpenAIEmbeddingDimensionsOption = new Option<int>(
+                aliases: new[] { "--azureOpenAIEmbeddingDimensions", "-aed" },
+                description: "The dimensions of the embedding")
+            { IsRequired = true };
+
+            #endregion
+
+            #region General options
             var extractTextOption = new Option<bool>(
                 aliases: new[] { "--extractText", "-e" },
                 getDefaultValue: () => true,
@@ -83,6 +113,7 @@ namespace AzureSearchCrawler
             var domSelectorOption = new Option<string>(
                 aliases: new[] { "--domSelector", "-ds" },
                 description: "DOM selector to limit which links to follow (e.g. 'div.blog-container div.blog-main')");
+            #endregion
 
             var rootCommand = new RootCommand("Web crawler that indexes content in Azure Search.")
             {
@@ -92,6 +123,10 @@ namespace AzureSearchCrawler
                 serviceEndPointOption,
                 indexNameOption,
                 adminApiKeyOption,
+                embeddingAiEndpointOption,
+                embeddingAiAdminKeyOption,
+                embeddingAiDeploymentNameOption,
+                azureOpenAIEmbeddingDimensionsOption,
                 extractTextOption,
                 dryRunOption,
                 sitesFileOption,
@@ -113,6 +148,12 @@ namespace AzureSearchCrawler
                     var dryRun = context.ParseResult.GetValueForOption(dryRunOption);
                     var sitesFile = context.ParseResult.GetValueForOption(sitesFileOption);
                     var domSelector = context.ParseResult.GetValueForOption(domSelectorOption);
+                    var embeddingEndPoint = context.ParseResult.GetValueForOption(embeddingAiEndpointOption);
+                    var embeddingAdminKey = context.ParseResult.GetValueForOption(embeddingAiAdminKeyOption);
+                    var embeddingDeploymentName = context.ParseResult.GetValueForOption(embeddingAiDeploymentNameOption);
+                    var azureOpenAIEmbeddingDimensions = context.ParseResult.GetValueForOption(azureOpenAIEmbeddingDimensionsOption);
+
+
 
                     if (rootUri == null && sitesFile == null)
                     {
@@ -128,10 +169,21 @@ namespace AzureSearchCrawler
                         return;
                     }
 
+                    if (!Uri.IsWellFormedUriString(embeddingEndPoint, UriKind.Absolute))
+                    {
+                        console.Error.Write($"Invalid service endpoint URL format: {embeddingEndPoint}{Environment.NewLine}");
+                        exitCode = 1;
+                        return;
+                    }
+
                     var indexer = _indexerFactory(
                             serviceEndPoint, 
                             indexName!, 
-                            adminApiKey!, 
+                            adminApiKey!,
+                            embeddingEndPoint,
+                            embeddingAdminKey,
+                            embeddingDeploymentName,
+                            azureOpenAIEmbeddingDimensions,
                             extractText,
                             new TextExtractor(), 
                             dryRun, 

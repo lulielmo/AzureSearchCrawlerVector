@@ -18,7 +18,8 @@ namespace AzureSearchCrawler
         /// <param name="url">Url</param>
         /// <param name="title">Title</param>
         /// <param name="content">Content</param>
-        public class WebPage(string url, string title, string content)
+        public class WebPage(string url, string title, string content,
+            ReadOnlyMemory<float> title_vector, ReadOnlyMemory<float> content_vector)
         {
             public string Id { get; } = CreateSHA512(url);
 
@@ -26,6 +27,10 @@ namespace AzureSearchCrawler
             public string Title { get; } = title;
 
             public string Content { get; } = content;
+
+            public ReadOnlyMemory<float> Title_Vector { get; } = title_vector;
+
+            public ReadOnlyMemory<float> Content_Vector { get; } = content_vector;
         }
     }
 }

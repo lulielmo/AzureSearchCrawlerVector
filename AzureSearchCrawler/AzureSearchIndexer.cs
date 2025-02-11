@@ -1,5 +1,7 @@
 using Abot2.Poco;
 using Azure;
+using Azure.AI.OpenAI;
+using OpenAI.Embeddings;
 using Azure.Search.Documents;
 using Azure.Search.Documents.Models;
 using System.Collections.Concurrent;
@@ -18,11 +20,19 @@ namespace AzureSearchCrawler
         private readonly string _searchServiceEndpoint;
         private readonly string _indexName;
         private readonly string _adminApiKey;
+        private readonly string _embeddingAiEndpoint;
+        private readonly string _embeddingAiAdminApiKey;
+        private readonly string _embeddingDeployment;
+        private readonly int _azureOpenAIEmbeddingDimensions;
         private readonly bool _extractText;
         private readonly TextExtractor _textExtractor;
         private readonly bool _dryRun;
         private readonly Interfaces.IConsole _console;
         private SearchClient? _searchClient;
+
+        private AzureOpenAIClient _azureOpenAIClient;
+        private EmbeddingClient _embeddingClient;
+        private EmbeddingGenerationOptions _embeddingOptions;
 
         private readonly BlockingCollection<WebPage> _queue = [];
         private readonly SemaphoreSlim indexingLock = new(1, 1);
@@ -31,6 +41,10 @@ namespace AzureSearchCrawler
             string searchServiceEndpoint,
             string indexName,
             string adminApiKey,
+            string embeddingAiEndpoint,
+            string embeddingAiAdminApiKey,
+            string embeddingDeployment,
+            int azureOpenAIEmbeddingDimensions,
             bool extractText,
             TextExtractor textExtractor,
             bool dryRun,
@@ -42,11 +56,23 @@ namespace AzureSearchCrawler
                 throw new ArgumentException("Value cannot be null or empty.", nameof(indexName));
             if (string.IsNullOrWhiteSpace(adminApiKey))
                 throw new ArgumentException("Value cannot be null or empty.", nameof(adminApiKey));
+            if (string.IsNullOrWhiteSpace(embeddingAiEndpoint))
+                throw new ArgumentException("Value cannot be null or empty.", nameof(embeddingAiEndpoint));
+            if (string.IsNullOrWhiteSpace(embeddingAiAdminApiKey))
+                throw new ArgumentException("Value cannot be null or empty.", nameof(embeddingAiAdminApiKey));
+            if (string.IsNullOrWhiteSpace(embeddingDeployment))
+                throw new ArgumentException("Value cannot be null or empty.", nameof(embeddingDeployment));
+            if (azureOpenAIEmbeddingDimensions == 0)
+                throw new ArgumentException("Value cannot be 0.", nameof(azureOpenAIEmbeddingDimensions));
             ArgumentNullException.ThrowIfNull(textExtractor);
 
             _searchServiceEndpoint = searchServiceEndpoint;
             _indexName = indexName;
             _adminApiKey = adminApiKey;
+            _embeddingAiEndpoint = embeddingAiEndpoint;
+            _embeddingAiAdminApiKey = embeddingAiAdminApiKey;
+            _embeddingDeployment = embeddingDeployment;
+            _azureOpenAIEmbeddingDimensions = azureOpenAIEmbeddingDimensions;
             _extractText = extractText;
             _textExtractor = textExtractor;
             _dryRun = dryRun;
@@ -55,6 +81,9 @@ namespace AzureSearchCrawler
             if (!dryRun)
             {
                 _searchClient = GetOrCreateSearchClient();
+                _azureOpenAIClient = GetOrCreateAiClient();
+                _embeddingClient = GetOrCreateEmbeddingClient();
+                _embeddingOptions = GetOrCreateEmbeddingGenerationOptions();
             }
         }
 
@@ -72,6 +101,52 @@ namespace AzureSearchCrawler
             var credential = new AzureKeyCredential(_adminApiKey);
             _searchClient = new SearchClient(endpoint, _indexName, credential);
             return _searchClient;
+        }
+
+        private AzureOpenAIClient GetOrCreateAiClient()
+        {
+            if (_azureOpenAIClient != null) return _azureOpenAIClient;
+            if (_dryRun) return null!;
+
+            if (string.IsNullOrEmpty(_embeddingAiEndpoint) || string.IsNullOrEmpty(_embeddingAiAdminApiKey))
+            {
+                throw new InvalidOperationException("AI Client cannot be initialized: Missing configuration");
+            }
+
+            Uri embeddingEndpoint = new(_embeddingAiEndpoint);
+            AzureKeyCredential embeddingCredential = new(_embeddingAiAdminApiKey);
+            _azureOpenAIClient = new AzureOpenAIClient(embeddingEndpoint, embeddingCredential);
+            return _azureOpenAIClient;
+        }
+
+        private EmbeddingClient GetOrCreateEmbeddingClient()
+        {
+            if (_embeddingClient != null) { return _embeddingClient; }
+            if (_dryRun) return null!;
+
+            if (string.IsNullOrEmpty(_embeddingDeployment) )
+            {
+                throw new InvalidOperationException("Embedding Client cannot be initialized: Missing configuration");
+            }
+
+            _embeddingClient = _azureOpenAIClient.GetEmbeddingClient(_embeddingDeployment);
+
+            return _embeddingClient;
+        }
+
+        private EmbeddingGenerationOptions GetOrCreateEmbeddingGenerationOptions()
+        {
+            if (_embeddingOptions != null) { return _embeddingOptions; }
+            if (_dryRun) return null!;
+
+            if (_azureOpenAIEmbeddingDimensions == 0)
+            {
+                throw new InvalidOperationException("Embedding generation options cannot be initialized: Missing configuration");
+            }
+
+            _embeddingOptions = new EmbeddingGenerationOptions { Dimensions = _azureOpenAIEmbeddingDimensions };
+
+            return _embeddingOptions;
         }
 
         public async Task PageCrawledAsync(CrawledPage crawledPage)
@@ -92,10 +167,15 @@ namespace AzureSearchCrawler
             if (_dryRun)
                 _console.WriteLine($"[DRY RUN] Would index page: {crawledPage.Uri.AbsoluteUri}");
             else
+            {
+                OpenAIEmbedding contentEmbedding = await _embeddingClient.GenerateEmbeddingAsync(text, _embeddingOptions);
+                OpenAIEmbedding titleEmbedding = await _embeddingClient.GenerateEmbeddingAsync(title, _embeddingOptions);
+
                 _queue.Add(new WebPage(
-                    crawledPage.Uri.AbsoluteUri,
-                    title ?? string.Empty,
-                    text));
+                        crawledPage.Uri.AbsoluteUri,
+                        title ?? string.Empty,
+                        text, titleEmbedding.ToFloats(), contentEmbedding.ToFloats()));
+            }
 
             if (_queue.Count > IndexingBatchSize)
             {
@@ -153,7 +233,7 @@ namespace AzureSearchCrawler
                 catch (Exception ex)
                 {
                     _console.WriteLine($"Error indexing batch: {ex.Message}");
-                    // L�gg tillbaka sidorna i k�n
+                    // Lägg tillbaka sidorna i kön
                     foreach (var page in pages)
                     {
                         _queue.Add(page);

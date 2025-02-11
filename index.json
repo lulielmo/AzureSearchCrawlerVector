@@ -2,89 +2,134 @@
   "name": "<name of your index>",
   "defaultScoringProfile": null,
   "fields": [
-    {
-      "name": "id",
-      "type": "Edm.String",
-      "searchable": false,
-      "filterable": false,
-      "retrievable": true,
-      "sortable": false,
-      "facetable": false,
-      "key": true,
-      "indexAnalyzer": null,
-      "searchAnalyzer": null,
-      "analyzer": null,
-      "normalizer": null,
-      "dimensions": null,
-      "vectorSearchProfile": null,
-      "synonymMaps": []
-    },
-    {
-      "name": "url",
-      "type": "Edm.String",
-      "searchable": true,
-      "filterable": false,
-      "retrievable": true,
-      "sortable": false,
-      "facetable": false,
-      "key": false,
-      "indexAnalyzer": null,
-      "searchAnalyzer": null,
-      "analyzer": "standard.lucene",
-      "normalizer": null,
-      "dimensions": null,
-      "vectorSearchProfile": null,
-      "synonymMaps": []
-    },
-    {
-      "name": "content",
-      "type": "Edm.String",
-      "searchable": true,
-      "filterable": false,
-      "retrievable": true,
-      "sortable": false,
-      "facetable": false,
-      "key": false,
-      "indexAnalyzer": null,
-      "searchAnalyzer": null,
-      "analyzer": "en.microsoft",
-      "normalizer": null,
-      "dimensions": null,
-      "vectorSearchProfile": null,
-      "synonymMaps": []
-    },
-    {
-      "name": "title",
-      "type": "Edm.String",
-      "searchable": true,
-      "filterable": false,
-      "retrievable": true,
-      "sortable": false,
-      "facetable": false,
-      "key": false,
-      "indexAnalyzer": null,
-      "searchAnalyzer": null,
-      "analyzer": "en.microsoft",
-      "normalizer": null,
-      "dimensions": null,
-      "vectorSearchProfile": null,
-      "synonymMaps": []
-    }
-  ],
-  "scoringProfiles": [],
-  "corsOptions": {
-    "allowedOrigins": [
-      "*"
+      {
+        "name": "id",
+        "type": "Edm.String",
+        "searchable": false,
+        "filterable": false,
+        "retrievable": true,
+        "stored": true,
+        "sortable": false,
+        "facetable": false,
+        "key": true,
+        "synonymMaps": []
+      },
+      {
+        "name": "url",
+        "type": "Edm.String",
+        "searchable": true,
+        "filterable": false,
+        "retrievable": true,
+        "stored": true,
+        "sortable": false,
+        "facetable": false,
+        "key": false,
+        "analyzer": "standard.lucene",
+        "synonymMaps": []
+      },
+      {
+        "name": "content",
+        "type": "Edm.String",
+        "searchable": true,
+        "filterable": false,
+        "retrievable": true,
+        "stored": true,
+        "sortable": false,
+        "facetable": false,
+        "key": false,
+        "analyzer": "en.microsoft",
+        "synonymMaps": []
+      },
+      {
+        "name": "content_vector",
+        "type": "Collection(Edm.Single)",
+        "searchable": true,
+        "filterable": false,
+        "retrievable": true,
+        "stored": true,
+        "sortable": false,
+        "facetable": false,
+        "key": false,
+        "dimensions": 3072,
+        "vectorSearchProfile": "vector-aibot-scraper-azureOpenAi-text-profile",
+        "synonymMaps": []
+      },
+      {
+        "name": "title",
+        "type": "Edm.String",
+        "searchable": true,
+        "filterable": false,
+        "retrievable": true,
+        "stored": true,
+        "sortable": false,
+        "facetable": false,
+        "key": false,
+        "analyzer": "en.microsoft",
+        "synonymMaps": []
+      },
+      {
+        "name": "title_vector",
+        "type": "Collection(Edm.Single)",
+        "searchable": true,
+        "filterable": false,
+        "retrievable": true,
+        "stored": true,
+        "sortable": false,
+        "facetable": false,
+        "key": false,
+        "dimensions": 3072,
+        "vectorSearchProfile": "vector-aibot-scraper-azureOpenAi-text-profile",
+        "synonymMaps": []
+      }
     ],
-    "maxAgeInSeconds": 300
-  },
-  "suggesters": [],
-  "analyzers": [],
-  "normalizers": [],
-  "tokenizers": [],
-  "tokenFilters": [],
-  "charFilters": [],
-  "encryptionKey": null,
-  "semantic": null,
-  "vectorSearch": null
-}
+    "scoringProfiles": [],
+    "corsOptions": {
+      "allowedOrigins": [
+        "*"
+      ],
+      "maxAgeInSeconds": 300
+    },
+    "suggesters": [],
+    "analyzers": [],
+    "normalizers": [],
+    "tokenizers": [],
+    "tokenFilters": [],
+    "charFilters": [],
+    "similarity": {
+      "@odata.type": "#Microsoft.Azure.Search.BM25Similarity"
+    },
+    "vectorSearch": {
+      "algorithms": [
+        {
+          "name": "vector-config-aibot",
+          "kind": "hnsw",
+          "hnswParameters": {
+            "metric": "cosine",
+            "m": 4,
+            "efConstruction": 400,
+            "efSearch": 500
+          }
+        }
+      ],
+      "profiles": [
+        {
+          "name": "vector-aibot-scraper-azureOpenAi-text-profile",
+          "algorithm": "vector-config-aibot",
+          "vectorizer": "vectorizer-aibot"
+        }
+      ],
+      "vectorizers": [
+        {
+          "name": "vectorizer-aibot",
+          "kind": "azureOpenAI",
+          "azureOpenAIParameters": {
+            "resourceUri": "https://oai-aibot-test-002.openai.azure.com",
+            "deploymentId": "text-embedding-3-large-aibot",
+            "apiKey": "<redacted>",
+            "modelName": "text-embedding-3-large"
+          }
+        }
+      ],
+      "compressions": []
+    }
+  }
