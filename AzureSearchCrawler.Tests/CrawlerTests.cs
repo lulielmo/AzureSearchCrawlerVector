@@ -183,7 +183,7 @@ namespace AzureSearchCrawler.Tests
         }
 
         [Fact]
-        public async Task CrawlAsync_WhenPageHasHttpError_DoesNotCallHandler()
+        public async Task CrawlAsync_WhenPageReturns404_DoesNotProcessPage()
         {
             // Arrange
             var uri = new Uri("http://example.com");

@@ -1,5 +1,8 @@
-﻿namespace AzureSearchCrawler.Adapters;
+﻿using System.Diagnostics.CodeAnalysis;
 
+namespace AzureSearchCrawler.Adapters;
+
+[ExcludeFromCodeCoverage]
 public class SystemConsoleAdapter : Interfaces.IConsole
 {
     private readonly System.CommandLine.IConsole _console;

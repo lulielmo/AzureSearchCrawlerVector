@@ -1,4 +1,5 @@
 using HtmlAgilityPack;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 using System.Web;  // För HtmlDecode
 
@@ -70,8 +71,11 @@ namespace AzureSearchCrawler
             return text.Trim();
         }
 
+        [ExcludeFromCodeCoverage]
         [GeneratedRegex("[\r\n]+")]
         private static partial Regex MyRegex();
+
+        [ExcludeFromCodeCoverage]
         [GeneratedRegex("[ \t]+")]
         private static partial Regex MyRegex1();
     }

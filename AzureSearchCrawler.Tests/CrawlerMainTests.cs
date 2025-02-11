@@ -45,7 +45,7 @@ namespace AzureSearchCrawler.Tests
         }
 
         [Fact]
-        public async Task RunAsync_WithValidArguments_ReturnsSuccessCode()
+        public async Task RunAsync_WhenAllArgumentsAreValid_CompletesSuccessfully()
         {
             // Arrange
             var args = new[]

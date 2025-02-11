@@ -30,9 +30,9 @@ namespace AzureSearchCrawler
         private readonly Interfaces.IConsole _console;
         private SearchClient? _searchClient;
 
-        private AzureOpenAIClient _azureOpenAIClient;
-        private EmbeddingClient _embeddingClient;
-        private EmbeddingGenerationOptions _embeddingOptions;
+        private AzureOpenAIClient? _azureOpenAIClient;
+        private EmbeddingClient? _embeddingClient;
+        private EmbeddingGenerationOptions ? _embeddingOptions;
 
         private readonly BlockingCollection<WebPage> _queue = [];
         private readonly SemaphoreSlim indexingLock = new(1, 1);
@@ -87,15 +87,10 @@ namespace AzureSearchCrawler
             }
         }
 
-        private SearchClient GetOrCreateSearchClient()
+        internal SearchClient GetOrCreateSearchClient()
         {
             if (_searchClient != null) return _searchClient;
             if (_dryRun) return null!;
-
-            if (string.IsNullOrEmpty(_searchServiceEndpoint) || string.IsNullOrEmpty(_indexName) || string.IsNullOrEmpty(_adminApiKey))
-            {
-                throw new InvalidOperationException("SearchClient cannot be initialized: Missing configuration");
-            }
 
             var endpoint = new Uri(_searchServiceEndpoint);
             var credential = new AzureKeyCredential(_adminApiKey);
@@ -103,15 +98,10 @@ namespace AzureSearchCrawler
             return _searchClient;
         }
 
-        private AzureOpenAIClient GetOrCreateAiClient()
+        internal AzureOpenAIClient GetOrCreateAiClient()
         {
             if (_azureOpenAIClient != null) return _azureOpenAIClient;
             if (_dryRun) return null!;
-
-            if (string.IsNullOrEmpty(_embeddingAiEndpoint) || string.IsNullOrEmpty(_embeddingAiAdminApiKey))
-            {
-                throw new InvalidOperationException("AI Client cannot be initialized: Missing configuration");
-            }
 
             Uri embeddingEndpoint = new(_embeddingAiEndpoint);
             AzureKeyCredential embeddingCredential = new(_embeddingAiAdminApiKey);
@@ -123,11 +113,7 @@ namespace AzureSearchCrawler
         {
             if (_embeddingClient != null) { return _embeddingClient; }
             if (_dryRun) return null!;
-
-            if (string.IsNullOrEmpty(_embeddingDeployment) )
-            {
-                throw new InvalidOperationException("Embedding Client cannot be initialized: Missing configuration");
-            }
+            ArgumentNullException.ThrowIfNull(_azureOpenAIClient);
 
             _embeddingClient = _azureOpenAIClient.GetEmbeddingClient(_embeddingDeployment);
 
@@ -138,11 +124,6 @@ namespace AzureSearchCrawler
         {
             if (_embeddingOptions != null) { return _embeddingOptions; }
             if (_dryRun) return null!;
-
-            if (_azureOpenAIEmbeddingDimensions == 0)
-            {
-                throw new InvalidOperationException("Embedding generation options cannot be initialized: Missing configuration");
-            }
 
             _embeddingOptions = new EmbeddingGenerationOptions { Dimensions = _azureOpenAIEmbeddingDimensions };
 
@@ -168,6 +149,8 @@ namespace AzureSearchCrawler
                 _console.WriteLine($"[DRY RUN] Would index page: {crawledPage.Uri.AbsoluteUri}");
             else
             {
+                ArgumentNullException.ThrowIfNull(_embeddingClient);
+
                 OpenAIEmbedding contentEmbedding = await _embeddingClient.GenerateEmbeddingAsync(text, _embeddingOptions);
                 OpenAIEmbedding titleEmbedding = await _embeddingClient.GenerateEmbeddingAsync(title, _embeddingOptions);
 
@@ -205,7 +188,7 @@ namespace AzureSearchCrawler
             }
         }
 
-        private async Task<IndexDocumentsResult> IndexBatchIfNecessary()
+        internal async Task<IndexDocumentsResult> IndexBatchIfNecessary()
         {
             await indexingLock.WaitAsync();
 
@@ -258,7 +241,7 @@ namespace AzureSearchCrawler
                 };
             }
 
-            // TextExtractor garanterar att b�de 'title' och 'content' finns i resultatet
+            // TextExtractor garanterar att både 'title' och 'content' finns i resultatet
             return _textExtractor.ExtractText(_extractText, crawledPage.Content.Text);
         }
 
