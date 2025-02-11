@@ -1,6 +1,6 @@
 # About
 
-This is a fork of [thomas11/AzureSearchCrawler:master](https://github.com/thomas11/AzureSearchCrawler) with additions of crawling multiple sites at once and using vector fields in the AI Search Index (vector functionality not finished yet).
+This is a fork of [thomas11/AzureSearchCrawler:master](https://github.com/thomas11/AzureSearchCrawler) with additions of crawling multiple sites at once and using vector fields in the AI Search Index.
 
 [Azure AI Search](https://azure.microsoft.com/en-us/products/ai-services/ai-search/) delivers accurate, hyper-personalized responses in your Gen AI applications. This project helps you get content from a website into an Azure AI Search index. It uses [Abot](https://github.com/sjdirect/abot) to crawl websites. For each page it extracts the content in a customizable way and indexes it into Azure Search.
 
@@ -27,20 +27,27 @@ Usage:
   AzureSearchCrawler [options]
 
 Options:
-  -r, --rootUri <rootUri>                             Root URI to start crawling from
-  -m, --maxPages <maxPages>                           Maximum number of pages to index [default: 100]
-  -d, --maxDepth <maxDepth>                           Maximum crawl depth [default: 10]
-  -s, --serviceEndPoint <serviceEndPoint> (REQUIRED)  Azure Search service endpoint
-  -i, --indexName <indexName> (REQUIRED)              Name of the search index
-  -a, --adminApiKey <adminApiKey> (REQUIRED)          Admin API key for Azure Search
-  -e, --extractText                                   Extract text from HTML (true) or save raw HTML (false) [default:
-                                                      True]
-  -dr, --dryRun                                       Test crawling without uploading to index [default: False]
-  -f, --sitesFile <sitesFile>                         Path to a JSON file containing sites to crawl
-  -ds, --domSelector <domSelector>                    DOM selector to limit which links to follow (e.g.
-                                                      'div.blog-container div.blog-main')
-  --version                                           Show version information
-  -?, -h, --help                                      Show help and usage information
+  -r, --rootUri <rootUri>                                    Root URI to start crawling from
+  -m, --maxPages <maxPages>                                  Maximum number of pages to index [default: 100]
+  -d, --maxDepth <maxDepth>                                  Maximum crawl depth [default: 10]
+  -s, --serviceEndPoint <serviceEndPoint> (REQUIRED)         Azure Search service endpoint
+  -i, --indexName <indexName> (REQUIRED)                     Name of the search index
+  -a, --adminApiKey <adminApiKey> (REQUIRED)                 Admin API key for Azure Search
+  -ee, --embeddingEndPoint <embeddingEndPoint> (REQUIRED)    The Url (service end point) of your Azure AI Embedding
+                                                             service
+  -ek, --embeddingAdminKey <embeddingAdminKey> (REQUIRED)    The admin key for your Azure AI Embedding service
+  -ed, --embeddingDeploymentName <embeddingDeploymentName>   The name of the deployment for your Azure AI Embedding
+  (REQUIRED)                                                 service
+  -aed, --azureOpenAIEmbeddingDimensions                     The dimensions of the embedding
+  <azureOpenAIEmbeddingDimensions> (REQUIRED)
+  -e, --extractText                                          Extract text from HTML (true) or save raw HTML (false)
+                                                             [default: True]
+  -dr, --dryRun                                              Test crawling without uploading to index [default: False]
+  -f, --sitesFile <sitesFile>                                Path to a JSON file containing sites to crawl
+  -ds, --domSelector <domSelector>                           DOM selector to limit which links to follow (e.g.
+                                                             'div.blog-container div.blog-main')
+  --version                                                  Show version information
+  -?, -h, --help                                             Show help and usage information
 ```
 > [!TIP]
 > By using the option `-dr, --dryRun` you can test the crawling without sending the extracted information to the Azure AI Search Index.
