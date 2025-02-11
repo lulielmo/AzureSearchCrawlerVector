@@ -6,6 +6,7 @@ using Azure.Search.Documents.Models;
 using AzureSearchCrawler.Tests.Mocks;
 using Moq;
 using OpenAI.Embeddings;
+using System.ClientModel;
 using System.Reflection;
 using Xunit;
 using static AzureSearchCrawler.AzureSearchIndexer;
@@ -83,11 +84,21 @@ namespace AzureSearchCrawler.Tests
                     It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new InvalidOperationException("SearchClient cannot be initialized"));
 
-            //_embeddingClientMock
-            //    .Setup(c => c.GenerateEmbeddingAsync(
-            //        It.IsAny<string>(),
-            //        It.IsAny<EmbeddingGenerationOptions>(),
-            //        It.IsAny<CancellationToken>())).ReturnsAsync(null);
+            // Create a real instance of BinaryData
+            var byteArray = new byte[] { (byte)0.1f, (byte)0.2f, (byte)0.3f };
+            var binaryData = new BinaryData(byteArray);
+
+            // Create a mock of OpenAIEmbedding with the correct constructor arguments
+            var fakeEmbedding = FakeOpenAIEmbedding.Create(new float[] { 0.1f, 0.2f, 0.3f });
+
+            _embeddingClientMock
+                .Setup(c => c.GenerateEmbeddingAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<EmbeddingGenerationOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(ClientResult.FromValue(
+                    fakeEmbedding, 
+                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
 
             // Lägg till 5 sidor
             for (int i = 0; i < 5; i++)
@@ -360,6 +371,22 @@ namespace AzureSearchCrawler.Tests
                     It.IsAny<CancellationToken>()))
                 .Returns(Task.FromResult(new MockIndexDocumentsResult(new MockHttpResponse()) as Response<IndexDocumentsResult>));
 
+            // Create a real instance of BinaryData
+            var byteArray = new byte[] { (byte)0.1f, (byte)0.2f, (byte)0.3f };
+            var binaryData = new BinaryData(byteArray);
+
+            // Create a mock of OpenAIEmbedding with the correct constructor arguments
+            var fakeEmbedding = FakeOpenAIEmbedding.Create([0.1f, 0.2f, 0.3f]);
+
+            _embeddingClientMock
+                .Setup(c => c.GenerateEmbeddingAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<EmbeddingGenerationOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(ClientResult.FromValue(
+                    fakeEmbedding,
+                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
+
             for (int i = 0; i < 3; i++)
             {
                 var crawledPage = new CrawledPage(new Uri($"http://example.com/{i}"))
@@ -405,6 +432,22 @@ namespace AzureSearchCrawler.Tests
                     It.IsAny<CancellationToken>()))
                 .Callback(() => indexedBatches++)
                 .Returns(Task.FromResult(new MockIndexDocumentsResult(new MockHttpResponse()) as Response<IndexDocumentsResult>));
+
+            // Create a real instance of BinaryData
+            var byteArray = new byte[] { (byte)0.1f, (byte)0.2f, (byte)0.3f };
+            var binaryData = new BinaryData(byteArray);
+
+            // Create a mock of OpenAIEmbedding with the correct constructor arguments
+            var fakeEmbedding = FakeOpenAIEmbedding.Create(new float[] { 0.1f, 0.2f, 0.3f });
+
+            _embeddingClientMock
+                .Setup(c => c.GenerateEmbeddingAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<EmbeddingGenerationOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(ClientResult.FromValue(
+                    fakeEmbedding,
+                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
 
             // Act
             for (int i = 0; i < 25; i++) // Ökat från 15 till 25 för att säkerställa flera batches
@@ -454,6 +497,22 @@ namespace AzureSearchCrawler.Tests
                     It.IsAny<IndexDocumentsOptions>(),
                     It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new Exception("Test exception"));
+
+            // Create a real instance of BinaryData
+            var byteArray = new byte[] { (byte)0.1f, (byte)0.2f, (byte)0.3f };
+            var binaryData = new BinaryData(byteArray);
+
+            // Create a mock of OpenAIEmbedding with the correct constructor arguments
+            var fakeEmbedding = FakeOpenAIEmbedding.Create(new float[] { 0.1f, 0.2f, 0.3f });
+
+            _embeddingClientMock
+                .Setup(c => c.GenerateEmbeddingAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<EmbeddingGenerationOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(ClientResult.FromValue(
+                    fakeEmbedding,
+                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
 
             var crawledPage = new CrawledPage(new Uri("http://example.com"))
             {
@@ -556,6 +615,22 @@ namespace AzureSearchCrawler.Tests
                     new MockIndexDocumentsResult(new MockHttpResponse()),
                     new MockHttpResponse()));
 
+            // Create a real instance of BinaryData
+            var byteArray = new byte[] { (byte)0.1f, (byte)0.2f, (byte)0.3f };
+            var binaryData = new BinaryData(byteArray);
+
+            // Create a mock of OpenAIEmbedding with the correct constructor arguments
+            var fakeEmbedding = FakeOpenAIEmbedding.Create(new float[] { 0.1f, 0.2f, 0.3f });
+
+            _embeddingClientMock
+                .Setup(c => c.GenerateEmbeddingAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<EmbeddingGenerationOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(ClientResult.FromValue(
+                    fakeEmbedding,
+                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
+
             // Lägg till sidor tills vi överstiger batchstorleken
             for (int i = 0; i < 15; i++)
             {
@@ -597,6 +672,22 @@ namespace AzureSearchCrawler.Tests
                     It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new Exception("Simulated indexing error"));
 
+            // Create a real instance of BinaryData
+            var byteArray = new byte[] { (byte)0.1f, (byte)0.2f, (byte)0.3f };
+            var binaryData = new BinaryData(byteArray);
+
+            // Create a mock of OpenAIEmbedding with the correct constructor arguments
+            var fakeEmbedding = FakeOpenAIEmbedding.Create(new float[] { 0.1f, 0.2f, 0.3f });
+
+            _embeddingClientMock
+                .Setup(c => c.GenerateEmbeddingAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<EmbeddingGenerationOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(ClientResult.FromValue(
+                    fakeEmbedding,
+                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
+
             var crawledPage = new CrawledPage(new Uri("http://example.com"))
             {
                 Content = new PageContent { Text = "<html><body>Test content</body></html>" }
@@ -613,22 +704,28 @@ namespace AzureSearchCrawler.Tests
         }
 
         [Theory]
-        [InlineData("", "test-index", "test-key", "searchServiceEndpoint")]
-        [InlineData(" ", "test-index", "test-key", "searchServiceEndpoint")]
-        [InlineData("https://test.search.windows.net", "", "test-key", "indexName")]
-        [InlineData("https://test.search.windows.net", "  ", "test-key", "indexName")]
-        [InlineData("https://test.search.windows.net", "test-index", "", "adminApiKey")]
-        [InlineData("https://test.search.windows.net", "test-index", "  ", "adminApiKey")]
+        [InlineData("", "test-index", "test-key", "https://test.ai.windows.net", "test-key2", "ai-deployment", 1, "searchServiceEndpoint")]
+        [InlineData(" ", "test-index", "test-key", "https://test.ai.windows.net", "test-key2", "ai-deployment", 1, "searchServiceEndpoint")]
+        [InlineData("https://test.search.windows.net", "", "test-key", "https://test.ai.windows.net", "test-key2", "ai-deployment", 1, "indexName")]
+        [InlineData("https://test.search.windows.net", "  ", "test-key", "https://test.ai.windows.net", "test-key2", "ai-deployment", 1, "indexName")]
+        [InlineData("https://test.search.windows.net", "test-index", "", "https://test.ai.windows.net", "test-key2", "ai-deployment", 1, "adminApiKey")]
+        [InlineData("https://test.search.windows.net", "test-index", "  ", "https://test.ai.windows.net", "test-key2", "ai-deployment", 1, "adminApiKey")]
+        [InlineData("https://test.search.windows.net", "test-index", "test-key", "", "test-key2", "ai-deployment", 1, "embeddingAiEndpoint")]
+        [InlineData("https://test.search.windows.net", "test-index", "test-key", " ", "test-key2", "ai-deployment", 1, "embeddingAiEndpoint")]
+        [InlineData("https://test.search.windows.net", "test-index", "test-key", "https://test.ai.windows.net", "", "ai-deployment", 1, "embeddingAiAdminApiKey")]
+        [InlineData("https://test.search.windows.net", "test-index", "test-key", "https://test.ai.windows.net", " ", "ai-deployment", 1, "embeddingAiAdminApiKey")]
+        [InlineData("https://test.search.windows.net", "test-index", "test-key", "https://test.ai.windows.net", "test-key2", "", 1, "embeddingDeployment")]
+        [InlineData("https://test.search.windows.net", "test-index", "test-key", "https://test.ai.windows.net", "test-key2", " ", 1, "embeddingDeployment")]
         public void Constructor_WithInvalidParameters_ThrowsArgumentException(
-            string endpoint, string index, string key, string expectedParamName)
+            string endpoint, string index, string key, string aiEndpoint, string aiKey, string aiDeployment, int aiDimension, string expectedParamName)
         {
             // Act & Assert
             var exception = Assert.Throws<ArgumentException>(() => new AzureSearchIndexer(
                 endpoint, index, key,
-                "https://test.ai.windows.net",
-                "test-key2",
-                "ai-deployment",
-                1,
+                aiEndpoint,
+                aiKey,
+                aiDeployment,
+                aiDimension,
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: false,
@@ -636,6 +733,27 @@ namespace AzureSearchCrawler.Tests
 
             Assert.Equal(expectedParamName, exception.ParamName);
             Assert.Contains("Value cannot be null or empty.", exception.Message);
+        }
+
+        [Theory]
+        [InlineData("https://test.search.windows.net", "test-index", "test-key", "https://test.ai.windows.net", "test-key2", "ai-deployment", 0, "azureOpenAIEmbeddingDimensions")]
+        public void Constructor_WithInvalidParametersZero_ThrowsArgumentException(
+            string endpoint, string index, string key, string aiEndpoint, string aiKey, string aiDeployment, int aiDimension, string expectedParamName)
+        {
+            // Act & Assert
+            var exception = Assert.Throws<ArgumentException>(() => new AzureSearchIndexer(
+                endpoint, index, key,
+                aiEndpoint,
+                aiKey,
+                aiDeployment,
+                aiDimension,
+                extractText: true,
+                textExtractor: _textExtractor.Object,
+                dryRun: false,
+                console: new TestConsole()));
+
+            Assert.Equal(expectedParamName, exception.ParamName);
+            Assert.Contains("Value cannot be 0.", exception.Message);
         }
 
         [Fact]
@@ -830,6 +948,22 @@ namespace AzureSearchCrawler.Tests
                     ["content"] = "Test Content"
                 });
 
+            // Create a real instance of BinaryData
+            var byteArray = new byte[] { (byte)0.1f, (byte)0.2f, (byte)0.3f };
+            var binaryData = new BinaryData(byteArray);
+
+            // Create a mock of OpenAIEmbedding with the correct constructor arguments
+            var fakeEmbedding = FakeOpenAIEmbedding.Create(new float[] { 0.1f, 0.2f, 0.3f });
+
+            _embeddingClientMock
+                .Setup(c => c.GenerateEmbeddingAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<EmbeddingGenerationOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(ClientResult.FromValue(
+                    fakeEmbedding,
+                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
+
             // Act
             await _indexer.PageCrawledAsync(crawledPage);
 
@@ -865,6 +999,22 @@ namespace AzureSearchCrawler.Tests
                     new MockIndexDocumentsResult(new MockHttpResponse()),
                     new MockHttpResponse()));
 
+            // Create a real instance of BinaryData
+            var byteArray = new byte[] { (byte)0.1f, (byte)0.2f, (byte)0.3f };
+            var binaryData = new BinaryData(byteArray);
+
+            // Create a mock of OpenAIEmbedding with the correct constructor arguments
+            var fakeEmbedding = FakeOpenAIEmbedding.Create(new float[] { 0.1f, 0.2f, 0.3f });
+
+            _embeddingClientMock
+                .Setup(c => c.GenerateEmbeddingAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<EmbeddingGenerationOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(ClientResult.FromValue(
+                    fakeEmbedding,
+                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
+
             // Fyll kön med 1000 sidor
             for (int i = 0; i < 1000; i++)
             {
@@ -897,6 +1047,22 @@ namespace AzureSearchCrawler.Tests
                     It.IsAny<IndexDocumentsOptions>(),
                     It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new Exception("Simulated indexing error"));
+
+            // Create a real instance of BinaryData
+            var byteArray = new byte[] { (byte)0.1f, (byte)0.2f, (byte)0.3f };
+            var binaryData = new BinaryData(byteArray);
+
+            // Create a mock of OpenAIEmbedding with the correct constructor arguments
+            var fakeEmbedding = FakeOpenAIEmbedding.Create(new float[] { 0.1f, 0.2f, 0.3f });
+
+            _embeddingClientMock
+                .Setup(c => c.GenerateEmbeddingAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<EmbeddingGenerationOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(ClientResult.FromValue(
+                    fakeEmbedding,
+                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
 
             // Lägg till några sidor i kön
             for (int i = 0; i < 5; i++)

@@ -53,7 +53,11 @@ namespace AzureSearchCrawler.Tests
                 "--rootUri", "http://example.com",
                 "--serviceEndPoint", "https://test.search.windows.net",
                 "--indexName", "test-index",
-                "--adminApiKey", "test-key"
+                "--adminApiKey", "test-key",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
             };
 
             // Act
@@ -88,7 +92,36 @@ namespace AzureSearchCrawler.Tests
                 "--rootUri", "http://example.com",
                 "--serviceEndPoint", "not-a-valid-url",
                 "--indexName", "test-index",
-                "--adminApiKey", "test-key"
+                "--adminApiKey", "test-key",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
+            };
+
+            // Act
+            var result = await _crawlerMain.RunAsync(args, testConsole);
+
+            // Assert
+            Assert.Equal(1, result);
+            Assert.Contains("Invalid service endpoint URL", string.Join(Environment.NewLine, testConsole.Errors));
+        }
+
+        [Fact]
+        public async Task RunAsync_WithInvalidAiServiceEndpoint_ReturnsErrorCode()
+        {
+            // Arrange
+            var testConsole = new TestConsole();
+            var args = new[]
+            {
+                "--rootUri", "http://example.com",
+                "--serviceEndPoint", "https://test.search.windows.net",
+                "--indexName", "test-index",
+                "--adminApiKey", "test-key",
+                "--embeddingEndPoint", "not-a-valid-url",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
             };
 
             // Act
@@ -109,7 +142,11 @@ namespace AzureSearchCrawler.Tests
                 "--rootUri", "ht tp://invalid.com", // Mellanslag gör URIn ogiltig men kraschar inte
                 "--serviceEndPoint", "https://test.search.windows.net",
                 "--indexName", "test-index",
-                "--adminApiKey", "test-key"
+                "--adminApiKey", "test-key",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
             };
 
             // Act
@@ -130,7 +167,11 @@ namespace AzureSearchCrawler.Tests
                 "--serviceEndPoint", "https://test.search.windows.net",
                 "--indexName", "test-index",
                 "--adminApiKey", "test-key",
-                "--dryRun", "true"
+                "--dryRun", "true",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
             };
             var testConsole = new TestConsole();
 
@@ -152,7 +193,11 @@ namespace AzureSearchCrawler.Tests
                 "--indexName", "test-index",
                 "--adminApiKey", "test-key",
                 "--maxPages", "50",
-                "--maxDepth", "3"
+                "--maxDepth", "3",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
             };
 
             // Act
@@ -184,7 +229,11 @@ namespace AzureSearchCrawler.Tests
                 "--sitesFile", tempFile,
                 "--serviceEndPoint", "https://test.search.windows.net",
                 "--indexName", "test-index",
-                "--adminApiKey", "test-key"
+                "--adminApiKey", "test-key",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
             };
 
             try
@@ -229,7 +278,11 @@ namespace AzureSearchCrawler.Tests
                 "--sitesFile", tempFile,
                 "--serviceEndPoint", "https://test.search.windows.net",
                 "--indexName", "test-index",
-                "--adminApiKey", "test-key"
+                "--adminApiKey", "test-key",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
             };
 
             try
@@ -263,7 +316,11 @@ namespace AzureSearchCrawler.Tests
                 "--sitesFile", "nonexistent.json",
                 "--serviceEndPoint", "https://test.search.windows.net",
                 "--indexName", "test-index",
-                "--adminApiKey", "test-key"
+                "--adminApiKey", "test-key",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
             };
 
             // Act
@@ -287,7 +344,11 @@ namespace AzureSearchCrawler.Tests
                 "--sitesFile", tempFile,
                 "--serviceEndPoint", "https://test.search.windows.net",
                 "--indexName", "test-index",
-                "--adminApiKey", "test-key"
+                "--adminApiKey", "test-key",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
             };
 
             try
@@ -314,7 +375,11 @@ namespace AzureSearchCrawler.Tests
             {
                 "--serviceEndPoint", "https://test.search.windows.net",
                 "--indexName", "test-index",
-                "--adminApiKey", "test-key"
+                "--adminApiKey", "test-key",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
             };
 
             // Act
@@ -338,7 +403,11 @@ namespace AzureSearchCrawler.Tests
                 "--sitesFile", tempFile,
                 "--serviceEndPoint", "https://test.search.windows.net",
                 "--indexName", "test-index",
-                "--adminApiKey", "test-key"
+                "--adminApiKey", "test-key",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
             };
 
             try
@@ -370,7 +439,11 @@ namespace AzureSearchCrawler.Tests
                 "--rootUri", "http://example.com",
                 "--serviceEndPoint", "https://test.search.windows.net",
                 "--indexName", "test-index",
-                "--adminApiKey", "test-key"
+                "--adminApiKey", "test-key",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
             };
 
             // Act
@@ -391,7 +464,11 @@ namespace AzureSearchCrawler.Tests
                 "--serviceEndPoint", "https://test.search.windows.net",
                 "--indexName", "test-index",
                 "--adminApiKey", "test-key",
-                "--domSelector", "div.blog-content"
+                "--domSelector", "div.blog-content",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
             };
 
             // Act
@@ -416,7 +493,11 @@ namespace AzureSearchCrawler.Tests
                 "--rootUri", "http://example.com",
                 "--serviceEndPoint", "https://test.search.windows.net",
                 "--indexName", "test-index",
-                "--adminApiKey", "test-key"
+                "--adminApiKey", "test-key",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
             };
 
             // Act
@@ -448,7 +529,11 @@ namespace AzureSearchCrawler.Tests
                 "--sitesFile", tempFile,
                 "--serviceEndPoint", "https://test.search.windows.net",
                 "--indexName", "test-index",
-                "--adminApiKey", "test-key"
+                "--adminApiKey", "test-key",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
             };
 
             try

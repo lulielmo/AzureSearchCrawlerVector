@@ -1,5 +1,6 @@
 using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
+using AzureSearchCrawler.Adapters;
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.CommandLine.IO;  // För SystemConsole

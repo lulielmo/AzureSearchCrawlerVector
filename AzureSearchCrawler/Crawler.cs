@@ -47,7 +47,6 @@ namespace AzureSearchCrawler
             var config = CreateCrawlConfiguration(maxPages, maxDepth);
             IWebCrawler crawler = _webCrawlerFactory(config);
 
-            //var crawler = _webCrawlerFactory(config);
             crawler.PageCrawlStarting += (sender, args) => crawler_ProcessPageCrawlStarting(sender!, args);
             crawler.PageCrawlCompleted += (sender, args) => crawler_ProcessPageCrawlCompleted(sender!, args);
             
