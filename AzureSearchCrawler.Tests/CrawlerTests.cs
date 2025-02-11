@@ -548,6 +548,10 @@ namespace AzureSearchCrawler.Tests
                 "https://test.search.windows.net",
                 "test-index",
                 "test-key",
+                "", //TODO: Fixa värden
+                "",
+                "",
+                0,
                 true,
                 new TextExtractor(),
                 false,

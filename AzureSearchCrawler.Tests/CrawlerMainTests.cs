@@ -26,8 +26,8 @@ namespace AzureSearchCrawler.Tests
 
             // Uppdatera konstruktorn utan domSelector
             _crawlerMain = new CrawlerMain(
-                (endpoint, index, key, extract, extractor, dryRun, console) =>
-                    new AzureSearchIndexer(endpoint, index, key, extract, extractor, dryRun, console),
+                (endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console) =>
+                    new AzureSearchIndexer(endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console),
                 (indexer) => _crawlerMock.Object);
 
             // Uppdatera mock setup med domSelector parameter

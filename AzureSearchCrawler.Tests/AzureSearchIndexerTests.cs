@@ -1,9 +1,11 @@
 ﻿using Abot2.Poco;
 using Azure;
+using Azure.AI.OpenAI;
 using Azure.Search.Documents;
 using Azure.Search.Documents.Models;
 using AzureSearchCrawler.Tests.Mocks;
 using Moq;
+using OpenAI.Embeddings;
 using System.Reflection;
 using Xunit;
 using static AzureSearchCrawler.AzureSearchIndexer;
@@ -13,6 +15,8 @@ namespace AzureSearchCrawler.Tests
     public class AzureSearchIndexerTests : IDisposable
     {
         private readonly Mock<SearchClient> _searchClientMock;
+        private readonly Mock<AzureOpenAIClient> _aiClientMock;
+        private readonly Mock<EmbeddingClient> _embeddingClientMock;
         private readonly Mock<TextExtractor> _textExtractor;
         private readonly TestConsole _console;
         private readonly AzureSearchIndexer _indexer;
@@ -21,6 +25,8 @@ namespace AzureSearchCrawler.Tests
         public AzureSearchIndexerTests()
         {
             _searchClientMock = new Mock<SearchClient>();
+            _aiClientMock = new Mock<AzureOpenAIClient>();
+            _embeddingClientMock = new Mock<EmbeddingClient>();
             _textExtractor = new Mock<TextExtractor>();
             _console = new TestConsole();
 
@@ -37,6 +43,10 @@ namespace AzureSearchCrawler.Tests
                 "https://test.search.windows.net",
                 "test-index",
                 "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: false,
@@ -45,6 +55,14 @@ namespace AzureSearchCrawler.Tests
             var searchClientField = typeof(AzureSearchIndexer)
                 .GetField("_searchClient", BindingFlags.NonPublic | BindingFlags.Instance);
             searchClientField!.SetValue(indexer, _searchClientMock.Object);
+
+            var aiClientField = typeof(AzureSearchIndexer)
+                .GetField("_azureOpenAIClient", BindingFlags.NonPublic | BindingFlags.Instance);
+            aiClientField!.SetValue(indexer, _aiClientMock.Object);
+
+            var embeddingClientField = typeof(AzureSearchIndexer)
+                .GetField("_embeddingClient", BindingFlags.NonPublic | BindingFlags.Instance);
+            embeddingClientField!.SetValue(indexer, _embeddingClientMock.Object);
 
             _indexer = indexer;
         }
@@ -64,6 +82,12 @@ namespace AzureSearchCrawler.Tests
                     It.IsAny<IndexDocumentsOptions>(),
                     It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new InvalidOperationException("SearchClient cannot be initialized"));
+
+            //_embeddingClientMock
+            //    .Setup(c => c.GenerateEmbeddingAsync(
+            //        It.IsAny<string>(),
+            //        It.IsAny<EmbeddingGenerationOptions>(),
+            //        It.IsAny<CancellationToken>())).ReturnsAsync(null);
 
             // Lägg till 5 sidor
             for (int i = 0; i < 5; i++)
@@ -136,6 +160,10 @@ namespace AzureSearchCrawler.Tests
                 "https://test.search.windows.net",
                 "test-index",
                 "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
                 true,
                 _textExtractor.Object,
                 dryRun: true,
@@ -174,6 +202,10 @@ namespace AzureSearchCrawler.Tests
                 "https://test.search.windows.net",
                 "test-index",
                 "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
                 true,
                 _textExtractor.Object,
                 dryRun: false,
@@ -211,6 +243,10 @@ namespace AzureSearchCrawler.Tests
                 "https://test.search.windows.net",
                 "test-index",
                 "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
                 true,
                 _textExtractor.Object,
                 false,
@@ -280,6 +316,10 @@ namespace AzureSearchCrawler.Tests
                 "https://test.search.windows.net",
                 "test-index",
                 "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
                 true,
                 _textExtractor.Object,
                 dryRun: true,  // Detta gör att _searchClient inte initialiseras
@@ -480,6 +520,10 @@ namespace AzureSearchCrawler.Tests
                 "https://test.search.windows.net",
                 "test-index",
                 "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
                 true,
                 _textExtractor.Object,
                 dryRun: true,
@@ -581,6 +625,10 @@ namespace AzureSearchCrawler.Tests
             // Act & Assert
             var exception = Assert.Throws<ArgumentException>(() => new AzureSearchIndexer(
                 endpoint, index, key,
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: false,
@@ -598,6 +646,10 @@ namespace AzureSearchCrawler.Tests
                 "https://test.search.windows.net",
                 "test-index",
                 "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: true,  // Aktivera dry-run
@@ -665,6 +717,10 @@ namespace AzureSearchCrawler.Tests
                 "https://test.search.windows.net",
                 "test-index",
                 "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: true,
@@ -688,6 +744,10 @@ namespace AzureSearchCrawler.Tests
                 searchServiceEndpoint: "",  // Tom sträng istället för null
                 indexName: "test-index",
                 adminApiKey: "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: false,
@@ -704,6 +764,10 @@ namespace AzureSearchCrawler.Tests
                 "https://test.search.windows.net",
                 "test-index",
                 "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: true,
@@ -729,6 +793,10 @@ namespace AzureSearchCrawler.Tests
                 "https://test.search.windows.net",
                 "test-index",
                 "invalid-key", // Använd ogiltig nyckel för att framkalla 403
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: false,
@@ -857,6 +925,10 @@ namespace AzureSearchCrawler.Tests
                 "https://test.search.windows.net",
                 "test-index",
                 "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: true,
@@ -885,6 +957,10 @@ namespace AzureSearchCrawler.Tests
                 "https://test.search.windows.net",
                 "test-index",
                 "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: true,
