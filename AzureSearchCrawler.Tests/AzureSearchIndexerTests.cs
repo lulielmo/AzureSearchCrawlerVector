@@ -83,7 +83,14 @@ namespace AzureSearchCrawler.Tests
         private static T GetPrivateMethod<T>(object instance, string methodName)
         {
             var method = instance.GetType().GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance);
-            return (T)method!.Invoke(instance, null)!;
+            try 
+            {
+                return (T)method!.Invoke(instance, null)!;
+            }
+            catch (TargetInvocationException ex)
+            {
+                throw ex.InnerException!;
+            }
         }
 
         [Fact]
@@ -1368,6 +1375,100 @@ namespace AzureSearchCrawler.Tests
             Assert.Empty(result["title"]);
             Assert.Empty(result["content"]);
             return Task.CompletedTask;
+        }
+
+        [Fact]
+        public async Task PageCrawledAsync_WithNullUri_ThrowsArgumentNullException()
+        {
+            // Arrange
+            var crawledPage = new CrawledPage(new Uri("http://example.com")) //<-- Cannot set empty or null
+            {
+                Content = new PageContent { Text = "test" }
+            };
+
+            crawledPage.Uri = null; // Set null here instead.
+
+            // Act & Assert
+            var exception = await Assert.ThrowsAsync<ArgumentNullException>(
+                async () => await _indexer.PageCrawledAsync(crawledPage));
+            Assert.Equal("crawledPage.Uri", exception.ParamName);
+        }
+
+        [Fact]
+        public async Task PageCrawledAsync_WhenEmbeddingClientIsNull_ThrowsArgumentNullException()
+        {
+            // Arrange
+            SetPrivateField<EmbeddingClient>(_indexer, "_embeddingClient", null);
+            var crawledPage = new CrawledPage(new Uri("http://example.com"))
+            {
+                Content = new PageContent { Text = "test content" }
+            };
+
+            _textExtractor
+                .Setup(x => x.ExtractText(It.IsAny<bool>(), It.IsAny<string>()))
+                .Returns(new Dictionary<string, string>
+                {
+                    ["title"] = "Test Title",
+                    ["content"] = "Test Content"
+                });
+
+            // Act & Assert
+            var exception = await Assert.ThrowsAsync<ArgumentNullException>(
+                async () => await _indexer.PageCrawledAsync(crawledPage));
+            Assert.Equal("_embeddingClient", exception.ParamName);
+        }
+
+        [Fact]
+        public void GetOrCreateEmbeddingClient_WhenAzureOpenAIClientIsNull_ThrowsArgumentNullException()
+        {
+            // Arrange
+            SetPrivateField<AzureOpenAIClient>(_indexer, "_embeddingClient", null);
+            SetPrivateField<AzureOpenAIClient>(_indexer, "_azureOpenAIClient", null);
+
+            // Act & Assert
+            var exception = Assert.Throws<ArgumentNullException>(
+                () => GetPrivateMethod<EmbeddingClient>(_indexer, "GetOrCreateEmbeddingClient"));
+            Assert.Equal("_azureOpenAIClient", exception.ParamName);
+        }
+
+        [Fact]
+        public async Task PageCrawledAsync_WithMissingTitle_UsesUntitledPage()
+        {
+            // Arrange
+            _textExtractor
+                .Setup(x => x.ExtractText(It.IsAny<bool>(), It.IsAny<string>()))
+                .Returns(new Dictionary<string, string>
+                {
+                    ["content"] = "Test Content"
+                    // title saknas medvetet
+                });
+
+            var crawledPage = new CrawledPage(new Uri("http://example.com"))
+            {
+                Content = new PageContent { Text = "test content" }
+            };
+
+            var fakeEmbedding = FakeOpenAIEmbedding.Create([0.1f, 0.2f, 0.3f]);
+
+            _embeddingClientMock
+                .Setup(c => c.GenerateEmbeddingAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<EmbeddingGenerationOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(ClientResult.FromValue(
+                    fakeEmbedding,
+                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
+
+            // Act
+            await _indexer.PageCrawledAsync(crawledPage);
+
+            // Assert
+            _embeddingClientMock.Verify(
+                x => x.GenerateEmbeddingAsync(
+                    "Untitled page",  // Verify default title is used
+                    It.IsAny<EmbeddingGenerationOptions>(),
+                    It.IsAny<CancellationToken>()),
+                Times.Once);
         }
     }
 }

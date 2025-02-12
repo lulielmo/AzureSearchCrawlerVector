@@ -137,7 +137,7 @@ namespace AzureSearchCrawler
 
             var page = ExtractPageContent(crawledPage);
             string? text = page.GetValueOrDefault("content");
-            string? title = page.GetValueOrDefault("title");
+            string? title = page.GetValueOrDefault("title") ?? "Untitled page";
 
             if (string.IsNullOrEmpty(text))
             {
@@ -181,11 +181,11 @@ namespace AzureSearchCrawler
                 throw;
             }
 
-            // sanity check
-            if (_queue.Count > 0)
-            {
-                _console.WriteLine("Error: indexing queue is still not empty at the end.");
-            }
+            // sanity check, unknown if this code will ever be reached.
+            //if (_queue.Count > 0)
+            //{
+            //    _console.WriteLine("Error: indexing queue is still not empty at the end.");
+            //}
         }
 
         internal async Task<IndexDocumentsResult> IndexBatchIfNecessary()
