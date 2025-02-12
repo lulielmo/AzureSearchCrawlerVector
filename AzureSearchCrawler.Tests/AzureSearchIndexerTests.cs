@@ -890,6 +890,34 @@ namespace AzureSearchCrawler.Tests
         }
 
         [Fact]
+        public void ExtractPageContent_WithNullTextExtractor_ThrowsArgumentNullException()
+        {
+            // Arrange
+            var indexer = new AzureSearchIndexer(
+                "https://test.search.windows.net",
+                "test-index",
+                "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
+                extractText: true,
+                textExtractor: _textExtractor.Object,
+                dryRun: false,
+                console: _console);
+
+            var crawledPage = new CrawledPage(new Uri("http://example.com"))
+            {
+                Content = new PageContent { Text = "test content" }
+            };
+
+            SetPrivateField<SearchClient>(indexer, "_textExtractor", null);
+
+            // Act & Assert
+            Assert.Throws<ArgumentNullException>(() => indexer.ExtractPageContent(crawledPage));
+        }
+
+        [Fact]
         public void GetOrCreateSearchClient_WhenDryRun_ReturnsNull()
         {
             // Arrange

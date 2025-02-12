@@ -226,6 +226,8 @@ namespace AzureSearchCrawler
 
         internal Dictionary<string, string> ExtractPageContent(CrawledPage crawledPage)
         {
+            ArgumentNullException.ThrowIfNull(_textExtractor);
+            
             if (crawledPage?.Content?.Text == null)
             {
                 return new Dictionary<string, string>
@@ -234,8 +236,7 @@ namespace AzureSearchCrawler
                     ["content"] = string.Empty
                 };
             }
-
-            // TextExtractor garanterar att både 'title' och 'content' finns i resultatet
+            
             return _textExtractor.ExtractText(_extractText, crawledPage.Content.Text);
         }
 

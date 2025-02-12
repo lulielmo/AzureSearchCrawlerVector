@@ -55,7 +55,7 @@ namespace AzureSearchCrawler
         {
             var node = doc.DocumentNode.SelectSingleNode(xpath);
 
-            foreach (var script in node.SelectNodes(".//script|.//style|.//svg|.//path")?.ToList() ?? new List<HtmlNode>())
+            foreach (var script in node.SelectNodes(".//script|.//style|.//svg|.//path")?.ToList() ?? [])
             {
                 script.Remove();
             }
