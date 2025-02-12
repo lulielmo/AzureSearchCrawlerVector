@@ -19,6 +19,8 @@ namespace AzureSearchCrawler
         private readonly Func<string, string, string, string, string, string, int, bool, TextExtractor, bool, Interfaces.IConsole, AzureSearchIndexer> _indexerFactory;
         private readonly Func<AzureSearchIndexer, ICrawler> _crawlerFactory;
 
+        private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
+
         public CrawlerMain(
             Func<string, string, string, string, string, string, int, bool, TextExtractor, bool, Interfaces.IConsole, AzureSearchIndexer>? indexerFactory = null,
             Func<AzureSearchIndexer, ICrawler>? crawlerFactory = null)
@@ -40,34 +42,34 @@ namespace AzureSearchCrawler
         {
             #region Site options
             var rootUriOption = new Option<string>(
-                aliases: new[] { "--rootUri", "-r" },
+                aliases: ["--rootUri", "-r"],
                 description: "Root URI to start crawling from");
 
 
             var maxPagesOption = new Option<int>(
-                aliases: new[] { "--maxPages", "-m" },
+                aliases: ["--maxPages", "-m"],
                 getDefaultValue: () => DefaultMaxPagesToIndex,
                 description: "Maximum number of pages to index");
 
             var maxDepthOption = new Option<int>(
-                aliases: new[] { "--maxDepth", "-d" },
+                aliases: ["--maxDepth", "-d"],
                 getDefaultValue: () => DefaultMaxCrawlDepth,
                 description: "Maximum crawl depth");
             #endregion
 
             #region Search service options
             var serviceEndPointOption = new Option<string>(
-                aliases: new[] { "--serviceEndPoint", "-s" },
+                aliases: ["--serviceEndPoint", "-s"],
                 description: "Azure Search service endpoint")
             { IsRequired = true };
 
             var indexNameOption = new Option<string>(
-                aliases: new[] { "--indexName", "-i" },
+                aliases: ["--indexName", "-i"],
                 description: "Name of the search index")
             { IsRequired = true };
 
             var adminApiKeyOption = new Option<string>(
-                aliases: new[] { "--adminApiKey", "-a" },
+                aliases: ["--adminApiKey", "-a"],
                 description: "Admin API key for Azure Search")
             { IsRequired = true };
             #endregion
@@ -75,22 +77,22 @@ namespace AzureSearchCrawler
             #region Embedding service options
 
             var embeddingAiEndpointOption = new Option<string>(
-                aliases: new[] { "--embeddingEndPoint", "-ee" },
+                aliases: ["--embeddingEndPoint", "-ee"],
                 description: "The Url (service end point) of your Azure AI Embedding service")
             { IsRequired = true };
 
             var embeddingAiAdminKeyOption = new Option<string>(
-                aliases: new[] { "--embeddingAdminKey", "-ek" },
+                aliases: ["--embeddingAdminKey", "-ek"],
                 description: "The admin key for your Azure AI Embedding service")
             { IsRequired = true };
 
             var embeddingAiDeploymentNameOption = new Option<string>(
-                aliases: new[] { "--embeddingDeploymentName", "-ed" },
+                aliases: ["--embeddingDeploymentName", "-ed"],
                 description: "The name of the deployment for your Azure AI Embedding service")
             { IsRequired = true };
 
             var azureOpenAIEmbeddingDimensionsOption = new Option<int>(
-                aliases: new[] { "--azureOpenAIEmbeddingDimensions", "-aed" },
+                aliases: ["--azureOpenAIEmbeddingDimensions", "-aed"],
                 description: "The dimensions of the embedding")
             { IsRequired = true };
 
@@ -98,21 +100,21 @@ namespace AzureSearchCrawler
 
             #region General options
             var extractTextOption = new Option<bool>(
-                aliases: new[] { "--extractText", "-e" },
+                aliases: ["--extractText", "-e"],
                 getDefaultValue: () => true,
                 description: "Extract text from HTML (true) or save raw HTML (false)");
 
             var dryRunOption = new Option<bool>(
-                aliases: new[] { "--dryRun", "-dr" },
+                aliases: ["--dryRun", "-dr"],
                 getDefaultValue: () => false,
                 description: "Test crawling without uploading to index");
 
             var sitesFileOption = new Option<FileInfo?>(
-                aliases: new[] { "--sitesFile", "-f" },
+                aliases: ["--sitesFile", "-f"],
                 description: "Path to a JSON file containing sites to crawl");
 
             var domSelectorOption = new Option<string>(
-                aliases: new[] { "--domSelector", "-ds" },
+                aliases: ["--domSelector", "-ds"],
                 description: "DOM selector to limit which links to follow (e.g. 'div.blog-container div.blog-main')");
             #endregion
 
@@ -204,7 +206,7 @@ namespace AzureSearchCrawler
                         {
                             var sites = JsonSerializer.Deserialize<List<SiteConfig>>(
                                 await File.ReadAllTextAsync(sitesFile.FullName),
-                                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                                _jsonOptions
                             ) ?? throw new InvalidOperationException("Failed to deserialize sites file");
 
                             if (sites == null || sites.Count == 0)

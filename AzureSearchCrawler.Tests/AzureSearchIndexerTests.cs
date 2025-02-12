@@ -21,7 +21,6 @@ namespace AzureSearchCrawler.Tests
         private readonly Mock<TextExtractor> _textExtractor;
         private readonly TestConsole _console;
         private readonly AzureSearchIndexer _indexer;
-        private const int IndexingBatchSize = 1000;
 
         public AzureSearchIndexerTests()
         {
@@ -68,9 +67,32 @@ namespace AzureSearchCrawler.Tests
             _indexer = indexer;
         }
 
+        private bool _disposed = false;
+
         public void Dispose()
         {
-            _console.Dispose();
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    // Free any other managed objects here.
+                    _console.Dispose();
+                }
+
+                // Free any unmanaged objects here.
+                _disposed = true;
+            }
+        }
+
+        ~AzureSearchIndexerTests()
+        {
+            Dispose(false);
         }
 
         // Helper-metoder för reflection
@@ -1383,10 +1405,9 @@ namespace AzureSearchCrawler.Tests
             // Arrange
             var crawledPage = new CrawledPage(new Uri("http://example.com")) //<-- Cannot set empty or null
             {
-                Content = new PageContent { Text = "test" }
+                Content = new PageContent { Text = "test" },
+                Uri = null // Set null here instead.
             };
-
-            crawledPage.Uri = null; // Set null here instead.
 
             // Act & Assert
             var exception = await Assert.ThrowsAsync<ArgumentNullException>(

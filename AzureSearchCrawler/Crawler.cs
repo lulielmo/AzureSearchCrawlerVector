@@ -47,8 +47,8 @@ namespace AzureSearchCrawler
             var config = CreateCrawlConfiguration(maxPages, maxDepth);
             IWebCrawler crawler = _webCrawlerFactory(config);
 
-            crawler.PageCrawlStarting += (sender, args) => crawler_ProcessPageCrawlStarting(sender!, args);
-            crawler.PageCrawlCompleted += (sender, args) => crawler_ProcessPageCrawlCompleted(sender!, args);
+            crawler.PageCrawlStarting += (sender, args) => Crawler_ProcessPageCrawlStarting(sender!, args);
+            crawler.PageCrawlCompleted += (sender, args) => Crawler_ProcessPageCrawlCompleted(sender!, args);
             
             if (domSelector != null)
             {
@@ -89,12 +89,12 @@ namespace AzureSearchCrawler
             }
             finally
             {
-                crawler.PageCrawlStarting -= crawler_ProcessPageCrawlStarting;
-                crawler.PageCrawlCompleted -= crawler_ProcessPageCrawlCompleted;
+                crawler.PageCrawlStarting -= Crawler_ProcessPageCrawlStarting;
+                crawler.PageCrawlCompleted -= Crawler_ProcessPageCrawlCompleted;
             }
         }
 
-        private void crawler_ProcessPageCrawlStarting(object? sender, PageCrawlStartingArgs args)
+        private void Crawler_ProcessPageCrawlStarting(object? sender, PageCrawlStartingArgs args)
         {
             ArgumentNullException.ThrowIfNull(args);
             Interlocked.Increment(ref PageCount);
@@ -104,7 +104,7 @@ namespace AzureSearchCrawler
             LogMessage($"{pageToCrawl.Uri.AbsoluteUri}  found on  {parentUri}, Depth: {pageToCrawl.CrawlDepth}");
         }
 
-        private async void crawler_ProcessPageCrawlCompleted(object? sender, PageCrawlCompletedArgs args)
+        private async void Crawler_ProcessPageCrawlCompleted(object? sender, PageCrawlCompletedArgs args)
         {
             ArgumentNullException.ThrowIfNull(args);
             CrawledPage crawledPage = args.CrawledPage;
@@ -125,7 +125,7 @@ namespace AzureSearchCrawler
             await _handler.PageCrawledAsync(crawledPage);
         }
 
-        private CrawlConfiguration CreateCrawlConfiguration(int maxPages, int maxDepth)
+        private static CrawlConfiguration CreateCrawlConfiguration(int maxPages, int maxDepth)
         {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 

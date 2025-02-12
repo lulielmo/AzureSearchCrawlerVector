@@ -180,12 +180,6 @@ namespace AzureSearchCrawler
                 }
                 throw;
             }
-
-            // sanity check, unknown if this code will ever be reached.
-            //if (_queue.Count > 0)
-            //{
-            //    _console.WriteLine("Error: indexing queue is still not empty at the end.");
-            //}
         }
 
         internal async Task<IndexDocumentsResult> IndexBatchIfNecessary()
