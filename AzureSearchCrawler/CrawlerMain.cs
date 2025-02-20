@@ -241,7 +241,6 @@ namespace AzureSearchCrawler
                         exitCode = 1;
                         return;
                     }
-                    //else if (rootUri != null)
                     else
                     {
                         console.WriteLine($"Crawling {rootUri} with depth {maxDepth} ({domSelector})...");

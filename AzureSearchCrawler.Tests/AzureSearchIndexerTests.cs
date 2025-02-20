@@ -1519,5 +1519,148 @@ namespace AzureSearchCrawler.Tests
                     It.IsAny<CancellationToken>()),
                 Times.Once);
         }
+
+        [Fact]
+        public async Task PageCrawledAsync_WithLongContent_TruncatesTextForEmbeddings()
+        {
+            // Arrange
+            var mockConsole = new Mock<Interfaces.IConsole>();
+            var mockEmbeddingClient = new Mock<EmbeddingClient>();
+            var mockSearchClient = new Mock<SearchClient>();
+            var textExtractor = new Mock<TextExtractor>();
+
+            var indexer = new AzureSearchIndexer(
+                "https://test.search.windows.net",
+                "test-index",
+                "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1536,
+                extractText: true,
+                textExtractor.Object,
+                dryRun: false,
+                mockConsole.Object);
+
+            // Sätt privata fält via reflection för att injecta våra mocks
+            typeof(AzureSearchIndexer)
+                .GetField("_embeddingClient", BindingFlags.NonPublic | BindingFlags.Instance)
+                ?.SetValue(indexer, mockEmbeddingClient.Object);
+
+            typeof(AzureSearchIndexer)
+                .GetField("_searchClient", BindingFlags.NonPublic | BindingFlags.Instance)
+                ?.SetValue(indexer, mockSearchClient.Object);
+
+            var longText = new string('a', 10000);  // Text längre än 8000 tecken
+            var crawledPage = new CrawledPage(new Uri("http://example.com"))
+            {
+                Content = new PageContent 
+                { 
+                    Text = $"<html><head><title>{longText}</title></head><body>{longText}</body></html>" 
+                }
+            };
+
+            textExtractor
+                .Setup(x => x.ExtractText(It.IsAny<bool>(), It.IsAny<string>()))
+                .Returns(new Dictionary<string, string>
+                {
+                    ["content"] = longText,
+                    ["title"] = longText
+                });
+
+            //var fakeEmbedding = FakeOpenAIEmbedding.Create([0.1f, 0.2f, 0.3f]);
+            var fakeEmbedding = FakeOpenAIEmbedding.Create(new float[1536]);
+
+            mockEmbeddingClient
+                .Setup(c => c.GenerateEmbeddingAsync(
+                    It.Is<string>(s => s.Length <= 8000),
+                    It.IsAny<EmbeddingGenerationOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(ClientResult.FromValue(
+                    fakeEmbedding,
+                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
+
+            // Act
+            await indexer.PageCrawledAsync(crawledPage);
+
+            // Assert
+            mockEmbeddingClient.Verify(
+                x => x.GenerateEmbeddingAsync(
+                    It.Is<string>(s => s.Length <= 8000),
+                    It.IsAny<EmbeddingGenerationOptions>(),
+                    It.IsAny<CancellationToken>()),
+                Times.Exactly(2));  // En gång för titel och en gång för innehåll
+        }
+
+        [Fact]
+        public async Task PageCrawledAsync_WithShortContent_DoesNotTruncateText()
+        {
+            // Arrange
+            var mockConsole = new Mock<Interfaces.IConsole>();
+            var mockEmbeddingClient = new Mock<EmbeddingClient>();
+            var mockSearchClient = new Mock<SearchClient>();
+            var textExtractor = new Mock<TextExtractor>();
+
+            var indexer = new AzureSearchIndexer(
+                "https://test.search.windows.net",
+                "test-index",
+                "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1536,
+                extractText: true,
+                textExtractor.Object,
+                dryRun: false,
+                mockConsole.Object);
+
+            // Sätt privata fält via reflection
+            typeof(AzureSearchIndexer)
+                .GetField("_embeddingClient", BindingFlags.NonPublic | BindingFlags.Instance)
+                ?.SetValue(indexer, mockEmbeddingClient.Object);
+
+            typeof(AzureSearchIndexer)
+                .GetField("_searchClient", BindingFlags.NonPublic | BindingFlags.Instance)
+                ?.SetValue(indexer, mockSearchClient.Object);
+
+            const string shortText = "Detta är en kort text";
+            var crawledPage = new CrawledPage(new Uri("http://example.com"))
+            {
+                Content = new PageContent
+                {
+                    Text = $"<html><head><title>Test</title></head><body>{shortText}</body></html>"
+                }
+            };
+
+            textExtractor
+                .Setup(x => x.ExtractText(It.IsAny<bool>(), It.IsAny<string>()))
+                .Returns(new Dictionary<string, string>
+                {
+                    ["content"] = shortText,
+                    ["title"] = shortText
+                });
+
+            var fakeEmbedding = FakeOpenAIEmbedding.Create(new float[1536]);
+
+            mockEmbeddingClient
+                .Setup(c => c.GenerateEmbeddingAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<EmbeddingGenerationOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(ClientResult.FromValue(
+                    fakeEmbedding,
+                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
+
+            // Act
+            await indexer.PageCrawledAsync(crawledPage);
+
+            // Assert
+            mockEmbeddingClient.Verify(
+                x => x.GenerateEmbeddingAsync(
+                    It.Is<string>(s => s.Contains(shortText)),
+                    It.IsAny<EmbeddingGenerationOptions>(),
+                    It.IsAny<CancellationToken>()),
+                Times.Exactly(2));  // En gång för titel och en gång för innehåll
+        }
     }
 }

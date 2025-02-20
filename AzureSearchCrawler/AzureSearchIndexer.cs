@@ -151,8 +151,13 @@ namespace AzureSearchCrawler
             {
                 ArgumentNullException.ThrowIfNull(_embeddingClient);
 
-                OpenAIEmbedding contentEmbedding = await _embeddingClient.GenerateEmbeddingAsync(text, _embeddingOptions);
-                OpenAIEmbedding titleEmbedding = await _embeddingClient.GenerateEmbeddingAsync(title, _embeddingOptions);
+                // Trunkera text till max 8000 tecken för att vara säker
+                const int maxLength = 8000;
+                string truncatedText = text.Length > maxLength ? text[..maxLength] : text;
+                string truncatedTitle = title.Length > maxLength ? title[..maxLength] : title;
+
+                OpenAIEmbedding contentEmbedding = await _embeddingClient.GenerateEmbeddingAsync(truncatedText, _embeddingOptions);
+                OpenAIEmbedding titleEmbedding = await _embeddingClient.GenerateEmbeddingAsync(truncatedTitle, _embeddingOptions);
 
                 _queue.Add(new WebPage(
                         crawledPage.Uri.AbsoluteUri,
