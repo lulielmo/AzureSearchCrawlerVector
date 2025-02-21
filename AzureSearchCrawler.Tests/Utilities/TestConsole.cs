@@ -1,4 +1,5 @@
-﻿using System.CommandLine.IO;
+﻿using AzureSearchCrawler.Models;
+using System.CommandLine.IO;
 using System.Text;
 
 public class TestStandardStreamWriter : IStandardStreamWriter
@@ -31,6 +32,7 @@ public class TestConsole : System.CommandLine.IConsole, AzureSearchCrawler.Inter
 {
     private readonly List<string> _output = new();
     private readonly List<string> _errors = new();
+    private bool _verbose;
 
     public IReadOnlyList<string> Output => _output;
     public IReadOnlyList<string> Errors => _errors;
@@ -47,6 +49,27 @@ public class TestConsole : System.CommandLine.IConsole, AzureSearchCrawler.Inter
         Error = new TestStandardStreamWriter(_errors);
     }
 
+    public void WriteLine(string message, LogLevel level = LogLevel.Info)
+    {
+        switch (level)
+        {
+            case LogLevel.Error:
+                Error.Write(message + Environment.NewLine);
+                break;
+            case LogLevel.Verbose:
+                if (_verbose)
+                    Out.Write($"VERBOSE: {message}{Environment.NewLine}");
+                break;
+            case LogLevel.Debug:
+                if (_verbose)
+                    Out.Write($"DEBUG: {message}{Environment.NewLine}");
+                break;
+            default:
+                Out.Write(message + Environment.NewLine);
+                break;
+        }
+    }
+
     public void WriteLine(string message) => Out.Write(message + Environment.NewLine);
     public void WriteError(string message) => Error.Write(message + Environment.NewLine);
     public void Clear()
@@ -57,6 +80,17 @@ public class TestConsole : System.CommandLine.IConsole, AzureSearchCrawler.Inter
 
     public void WriteLine(string format, params object[] args) =>
         Out.Write(string.Format(format, args) + Environment.NewLine);
+
+    public void WriteInfoLine(string format, params object[] args)
+        => WriteLine(string.Format(format, args), LogLevel.Info);
+
+    public void WriteDebugLine(string format, params object[] args)
+        => WriteLine(string.Format(format, args), LogLevel.Debug);
+
+    public void WriteVerboseLine(string format, params object[] args)
+        => WriteLine(string.Format(format, args), LogLevel.Verbose);
+
+    public void SetVerbose(bool verbose) => _verbose = verbose;
 
     public void Dispose()
     {

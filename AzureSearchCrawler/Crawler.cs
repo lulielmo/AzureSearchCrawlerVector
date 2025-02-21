@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Threading;
 using System.Linq;
 using AngleSharp.Dom;
+using AzureSearchCrawler.Models;
 
 namespace AzureSearchCrawler
 {
@@ -21,17 +22,19 @@ namespace AzureSearchCrawler
         private readonly CrawlHandler _handler;
         private readonly Func<CrawlConfiguration, IWebCrawler> _webCrawlerFactory;
         private readonly Interfaces.IConsole _console;
+        private readonly LogLevel _logLevel;
 
-        public Crawler(CrawlHandler handler, Interfaces.IConsole console)
-            : this(handler, config => new PoliteWebCrawler(config), console)
+        public Crawler(CrawlHandler handler, Interfaces.IConsole console, LogLevel logLevel = LogLevel.Info)
+            : this(handler, config => new PoliteWebCrawler(config), console, logLevel)
         {
         }
 
-        public Crawler(CrawlHandler handler, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, Interfaces.IConsole console)
+        public Crawler(CrawlHandler handler, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, Interfaces.IConsole console, LogLevel logLevel)
         {
             _handler = handler ?? throw new ArgumentNullException(nameof(handler));
             _webCrawlerFactory = crawlerFactory ?? throw new ArgumentNullException(nameof(crawlerFactory));
             _console = console ?? throw new ArgumentNullException(nameof(console));
+            _logLevel = logLevel;
         }
 
         public async Task CrawlAsync(Uri rootUri, int maxPages, int maxDepth, string? domSelector = null)
@@ -57,7 +60,7 @@ namespace AzureSearchCrawler
                     if (crawledPage.AngleSharpHtmlDocument == null)
                         return true;
 
-                    _console.WriteLine($"Checking {uri.AbsoluteUri} against selector '{domSelector}'");
+                    LogMessage($"Checking {uri.AbsoluteUri} against selector '{domSelector}'", LogLevel.Verbose);
                     var links = crawledPage.AngleSharpHtmlDocument
                         .QuerySelectorAll($"{domSelector} a")
                         .Where(a => a.OuterHtml.Contains(uri.LocalPath));
@@ -65,7 +68,7 @@ namespace AzureSearchCrawler
                     var shouldCrawl = links.Any();
                     if (!shouldCrawl)
                     {
-                        _console.WriteLine($"Skipping {uri.AbsoluteUri} - not found within {domSelector}");
+                        LogMessage($"Skipping {uri.AbsoluteUri} - not found within {domSelector}", LogLevel.Debug);
                     }
                     
                     return shouldCrawl;
@@ -144,9 +147,10 @@ namespace AzureSearchCrawler
             return crawlConfig;
         }
 
-        private void LogMessage(string message)
+        private void LogMessage(string message, LogLevel level = LogLevel.Info)
         {
-            _console.WriteLine(message);
+            if (level <= _logLevel)
+                _console.WriteLine(message, level);
         }
     }
 }

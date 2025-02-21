@@ -4,12 +4,14 @@ using Moq;
 using Xunit;
 using AngleSharp.Html.Parser;
 using AngleSharp;
+using AzureSearchCrawler.Models;
 
 namespace AzureSearchCrawler.Tests
 {
 
     public class CrawlerTests : IDisposable
     {
+        private LogLevel _logLevel;
         private readonly Mock<IWebCrawler> _webCrawlerMock;
         private readonly Mock<CrawlHandler> _handlerMock;
         private readonly TestConsole _console;
@@ -20,6 +22,7 @@ namespace AzureSearchCrawler.Tests
 
         public CrawlerTests()
         {
+            _logLevel = new LogLevel();
             _webCrawlerMock = new Mock<IWebCrawler>();
             _handlerMock = new Mock<CrawlHandler>();
             _console = new TestConsole();
@@ -30,7 +33,7 @@ namespace AzureSearchCrawler.Tests
             Console.SetOut(_stringWriter);
             Console.SetError(_stringWriter);
 
-            _crawler = new Crawler(_handlerMock.Object, _ => _webCrawlerMock.Object, _console);
+            _crawler = new Crawler(_handlerMock.Object, _ => _webCrawlerMock.Object, _console, _logLevel);
         }
 
         public void Dispose()
@@ -339,7 +342,7 @@ namespace AzureSearchCrawler.Tests
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
-            }, _console);
+            }, _console, _logLevel);
 
             // Act
             await crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1);
@@ -364,7 +367,7 @@ namespace AzureSearchCrawler.Tests
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
-            }, testConsole);
+            }, testConsole, _logLevel);
 
             var eventRaised = new TaskCompletionSource<bool>();
 
@@ -455,13 +458,14 @@ namespace AzureSearchCrawler.Tests
         public async Task CrawlAsync_LogsCorrectMessages(int maxPages, int maxDepth)
         {
             // Arrange
+            LogLevel logLevel = LogLevel.Debug;
             var uri = new Uri("http://example.com");
             var testConsole = new TestConsole();
             var crawler = new Crawler(_handlerMock.Object, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
-            }, testConsole);
+            }, testConsole, logLevel);
 
             var eventRaised = new TaskCompletionSource<bool>();
 
@@ -499,13 +503,14 @@ namespace AzureSearchCrawler.Tests
         public async Task CrawlAsync_WithValidUri_LogsProgress()
         {
             // Arrange
+            LogLevel logLevel = LogLevel.Debug;
             var uri = new Uri("http://example.com");
             var testConsole = new TestConsole();
             var crawler = new Crawler(_handlerMock.Object, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
-            }, testConsole);
+            }, testConsole, logLevel);
 
             var eventRaised = new TaskCompletionSource<bool>();
             var crawlResult = new CrawlResult
@@ -571,8 +576,8 @@ namespace AzureSearchCrawler.Tests
                 </html>";
 
             // Skapa AngleSharp dokument
-            var context = BrowsingContext.New();
-            var document = await context.OpenAsync(req => req.Content(htmlContent));
+            //var context = BrowsingContext.New();
+            //var document = await context.OpenAsync(req => req.Content(htmlContent));
 
             var crawledPage = new CrawledPage(uri)
             {
@@ -602,12 +607,11 @@ namespace AzureSearchCrawler.Tests
                     CrawlContext = new CrawlContext()
                 });
 
-            //var crawler = new Crawler(indexer, _webCrawlerMock.Object, testConsole);
             var crawler = new Crawler(indexer, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
-            }, testConsole);
+            }, testConsole, _logLevel);
             
             // Act
             await crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1, domSelector: "div.blog-content");
@@ -619,6 +623,101 @@ namespace AzureSearchCrawler.Tests
             
             Assert.True(goodDecision, "Good link should be allowed");
             Assert.False(badDecision, "Bad link should be filtered out");
+        }
+
+        [Fact]
+        public async Task CrawlAsync_WithVerboseLogging_ShowsLinkChecking()
+        {
+            // Arrange
+            var uri = new Uri("http://example.com");
+            var testConsole = new TestConsole();
+            testConsole.SetVerbose(true);
+            
+            
+
+            var crawlResult = new CrawlResult
+            {
+                RootUri = uri,
+                CrawlContext = new CrawlContext()
+            };
+
+            _webCrawlerMock
+                .Setup(c => c.CrawlAsync(It.IsAny<Uri>()))
+                .ReturnsAsync(crawlResult);
+
+            // Simulera en länkkontroll genom att trigga ShouldScheduleLinkDecisionMaker
+            var linkUri = new Uri("http://example.com/page");
+            var htmlContent = "<html><body><div class='content'><a href='/page'>Link</a></div></body></html>";
+            var context = BrowsingContext.New(Configuration.Default);
+            var parser = context.GetService<IHtmlParser>();
+            var document = parser!.ParseDocument(htmlContent);
+
+            var crawledPage = new CrawledPage(uri)
+            {
+                Content = new PageContent { Text = htmlContent }
+            };
+
+            Func<Uri, CrawledPage, CrawlContext, bool>? linkDecisionMaker = null;
+            _webCrawlerMock.SetupSet(c => c.ShouldScheduleLinkDecisionMaker = It.IsAny<Func<Uri, CrawledPage, CrawlContext, bool>>())
+                .Callback<Func<Uri, CrawledPage, CrawlContext, bool>>(func => linkDecisionMaker = func);
+
+            _webCrawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>()))
+                .Callback(() => 
+                {
+                    var goodLink = new Uri(uri, "/page");
+                    
+                    Assert.NotNull(linkDecisionMaker);
+                    var goodDecision = linkDecisionMaker(goodLink, crawledPage, new CrawlContext());
+                })
+                .ReturnsAsync(new CrawlResult 
+                { 
+                    RootUri = uri,
+                    CrawlContext = new CrawlContext()
+                });
+
+            var crawler = new Crawler(_handlerMock.Object, config =>
+            {
+                _lastConfig = config;
+                return _webCrawlerMock.Object;
+            }, testConsole, LogLevel.Verbose);
+            
+            // Act
+            await crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1, domSelector: "div.content");
+
+            // Assert
+            Assert.Contains(testConsole.Output, m => m.StartsWith("VERBOSE: Checking"));
+        }
+
+        [Fact]
+        public async Task CrawlAsync_WithoutVerboseLogging_HidesLinkChecking()
+        {
+            // Arrange
+            var uri = new Uri("http://example.com");
+            var testConsole = new TestConsole();
+            testConsole.SetVerbose(false);
+            
+            var crawler = new Crawler(_handlerMock.Object, config =>
+            {
+                _lastConfig = config;
+                return _webCrawlerMock.Object;
+            }, testConsole, LogLevel.Info);
+
+            var crawlResult = new CrawlResult
+            {
+                RootUri = uri,
+                CrawlContext = new CrawlContext()
+            };
+
+            _webCrawlerMock
+                .Setup(c => c.CrawlAsync(It.IsAny<Uri>()))
+                .ReturnsAsync(crawlResult);
+
+            // Act
+            await crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1, domSelector: "div.content");
+
+            // Assert
+            Assert.DoesNotContain(testConsole.Output, m => m.StartsWith("VERBOSE:"));
+            Assert.DoesNotContain(testConsole.Output, m => m.StartsWith("DEBUG:"));
         }
 
         private static CrawlConfiguration? _lastConfig;  // För att fånga konfigurationen

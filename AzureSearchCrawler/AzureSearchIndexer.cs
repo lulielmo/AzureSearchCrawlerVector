@@ -141,7 +141,7 @@ namespace AzureSearchCrawler
 
             if (string.IsNullOrEmpty(text))
             {
-                _console.WriteLine("No content for page {0}", crawledPage.Uri.AbsoluteUri);
+                _console.WriteInfoLine("No content for page {0}", crawledPage.Uri.AbsoluteUri);
                 return;
             }
 
@@ -200,7 +200,7 @@ namespace AzureSearchCrawler
                 }
 
                 int batchSize = Math.Min(_queue.Count, IndexingBatchSize);
-                _console.WriteLine("Indexing batch of {0}", batchSize);
+                _console.WriteInfoLine("Indexing batch of {0}", batchSize);
 
                 var pages = new List<WebPage>(batchSize);
                 for (int i = 0; i < batchSize; i++)

@@ -116,6 +116,10 @@ namespace AzureSearchCrawler
             var domSelectorOption = new Option<string>(
                 aliases: ["--domSelector", "-ds"],
                 description: "DOM selector to limit which links to follow (e.g. 'div.blog-container div.blog-main')");
+
+            var verboseOption = new Option<bool>(
+                aliases: ["-v", "--verbose" ],
+                description:"Enable verbose output");
             #endregion
 
             var rootCommand = new RootCommand("Web crawler that indexes content in Azure Search.")
@@ -133,7 +137,8 @@ namespace AzureSearchCrawler
                 extractTextOption,
                 dryRunOption,
                 sitesFileOption,
-                domSelectorOption
+                domSelectorOption,
+                verboseOption
             };
 
             int exitCode = 0;
@@ -155,8 +160,8 @@ namespace AzureSearchCrawler
                     var embeddingAdminKey = context.ParseResult.GetValueForOption(embeddingAiAdminKeyOption);
                     var embeddingDeploymentName = context.ParseResult.GetValueForOption(embeddingAiDeploymentNameOption);
                     var azureOpenAIEmbeddingDimensions = context.ParseResult.GetValueForOption(azureOpenAIEmbeddingDimensionsOption);
-
-
+                    var verbose = context.ParseResult.GetValueForOption(verboseOption);
+                    var logLevel = verbose ? LogLevel.Verbose : LogLevel.Info;
 
                     if (rootUri == null && sitesFile == null)
                     {
