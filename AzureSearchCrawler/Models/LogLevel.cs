@@ -2,9 +2,10 @@ namespace AzureSearchCrawler.Models
 {
     public enum LogLevel
     {
-        Error,      // Endast fel
-        Info,       // Standardnivå - viktig information
-        Debug,      // Detaljerad information
-        Verbose     // All information inklusive länkkontroller
+        Verbose,    // Mest detaljerad nivå
+        Debug,      // För utvecklare
+        Info,       // Normal information
+        Warning,    // Potentiella problem
+        Error       // Faktiska fel
     } 
 }

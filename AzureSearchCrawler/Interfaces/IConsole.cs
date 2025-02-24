@@ -13,5 +13,9 @@ namespace AzureSearchCrawler.Interfaces
         void WriteVerboseLine(string format, params object[] args);
 
         void WriteError(string message);
+
+        void WriteWarningLine(string message, params object[] args);
+
+        void SetVerbose(bool verbose);
     }
 }

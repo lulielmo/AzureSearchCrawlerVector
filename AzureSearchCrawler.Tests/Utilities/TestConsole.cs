@@ -90,10 +90,15 @@ public class TestConsole : System.CommandLine.IConsole, AzureSearchCrawler.Inter
     public void WriteVerboseLine(string format, params object[] args)
         => WriteLine(string.Format(format, args), LogLevel.Verbose);
 
+    public void WriteWarningLine(string message, params object[] args)
+        => WriteLine(string.Format(message, args), LogLevel.Warning);
+
     public void SetVerbose(bool verbose) => _verbose = verbose;
 
     public void Dispose()
     {
         // Inget att städa upp
     }
+
+    
 }

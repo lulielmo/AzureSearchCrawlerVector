@@ -50,6 +50,10 @@ public class SystemConsoleAdapter : Interfaces.IConsole
     public void WriteVerboseLine(string format, params object[] args)
         => WriteLine(format, LogLevel.Verbose, args);
 
-    
+    public void WriteWarningLine(string message, params object[] args)
+    {
+        WriteLine(string.Format(message, args), LogLevel.Warning);
+    }
+
     public void SetVerbose(bool verbose) => _verbose = verbose;
 }

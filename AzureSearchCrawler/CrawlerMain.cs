@@ -17,17 +17,39 @@ namespace AzureSearchCrawler
         private const int DefaultMaxPagesToIndex = 100;
         private const int DefaultMaxCrawlDepth = 10;
         private readonly Func<string, string, string, string, string, string, int, bool, TextExtractor, bool, Interfaces.IConsole, AzureSearchIndexer> _indexerFactory;
-        private readonly Func<AzureSearchIndexer, ICrawler> _crawlerFactory;
+        private readonly Func<AzureSearchIndexer, CrawlMode, Interfaces.IConsole, ICrawler> _crawlerFactory;
 
         private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
         public CrawlerMain(
             Func<string, string, string, string, string, string, int, bool, TextExtractor, bool, Interfaces.IConsole, AzureSearchIndexer>? indexerFactory = null,
-            Func<AzureSearchIndexer, ICrawler>? crawlerFactory = null)
+            Func<AzureSearchIndexer, CrawlMode, Interfaces.IConsole, ICrawler>? crawlerFactory = null)
         {
-            _indexerFactory = indexerFactory ?? ((endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, azureOpenAIEmbeddingDimensions, extract, extractor, dryRun, console) =>
-                new AzureSearchIndexer(endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, azureOpenAIEmbeddingDimensions, extract, extractor, dryRun, console));
-            _crawlerFactory = crawlerFactory ?? (indexer => new Crawler(indexer, new SystemConsoleAdapter(new SystemConsole())));
+            _indexerFactory = indexerFactory ?? DefaultIndexerFactory;
+            _crawlerFactory = crawlerFactory ?? DefaultCrawlerFactory;
+        }
+
+        private static ICrawler DefaultCrawlerFactory(AzureSearchIndexer indexer, CrawlMode mode, Interfaces.IConsole console)
+        {
+            return mode switch
+            {
+                CrawlMode.Sitemap => new SitemapCrawler(indexer, console),
+                CrawlMode.Standard => new Crawler(indexer, console),
+                _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", nameof(mode))
+            };
+        }
+
+        private static AzureSearchIndexer DefaultIndexerFactory(
+            string endpoint, string index, string key, 
+            string embeddingEndpoint, string embeddingKey, string embeddingDeployment,
+            int embeddingDimensions, bool extract, TextExtractor extractor, 
+            bool dryRun, Interfaces.IConsole console)
+        {
+            return new AzureSearchIndexer(
+                endpoint, index, key, 
+                embeddingEndpoint, embeddingKey, embeddingDeployment,
+                embeddingDimensions, extract, extractor, 
+                dryRun, console);
         }
 
         // Entry point
@@ -118,8 +140,14 @@ namespace AzureSearchCrawler
                 description: "DOM selector to limit which links to follow (e.g. 'div.blog-container div.blog-main')");
 
             var verboseOption = new Option<bool>(
-                aliases: ["-v", "--verbose" ],
+                aliases: ["--verbose", "-v"],
+                getDefaultValue: () => false,
                 description:"Enable verbose output");
+
+            var modeOption = new Option<CrawlMode>(
+                aliases: ["--crawlMode", "-cm"],
+                getDefaultValue: () => CrawlMode.Standard,
+                description: "Crawling mode (Standard or Sitemap)");
             #endregion
 
             var rootCommand = new RootCommand("Web crawler that indexes content in Azure Search.")
@@ -138,7 +166,8 @@ namespace AzureSearchCrawler
                 dryRunOption,
                 sitesFileOption,
                 domSelectorOption,
-                verboseOption
+                verboseOption,
+                modeOption
             };
 
             int exitCode = 0;
@@ -161,7 +190,11 @@ namespace AzureSearchCrawler
                     var embeddingDeploymentName = context.ParseResult.GetValueForOption(embeddingAiDeploymentNameOption);
                     var azureOpenAIEmbeddingDimensions = context.ParseResult.GetValueForOption(azureOpenAIEmbeddingDimensionsOption);
                     var verbose = context.ParseResult.GetValueForOption(verboseOption);
+                    var mode = context.ParseResult.GetValueForOption(modeOption);
                     var logLevel = verbose ? LogLevel.Verbose : LogLevel.Info;
+
+                    console.WriteLine($"Verbose mode: {verbose}");  // Debug-utskrift
+                    console.WriteLine($"Crawl mode: {mode}");      // Debug-utskrift
 
                     if (rootUri == null && sitesFile == null)
                     {
@@ -184,6 +217,9 @@ namespace AzureSearchCrawler
                         return;
                     }
 
+                    var consoleAdapter = new SystemConsoleAdapter(context.Console);
+                    consoleAdapter.SetVerbose(verbose);
+
                     var indexer = _indexerFactory(
                             serviceEndPoint, 
                             indexName!, 
@@ -195,8 +231,8 @@ namespace AzureSearchCrawler
                             extractText,
                             new TextExtractor(), 
                             dryRun, 
-                            new SystemConsoleAdapter(console));
-                    var crawler = _crawlerFactory(indexer);
+                            consoleAdapter);
+                    var crawler = _crawlerFactory(indexer, mode, consoleAdapter);
 
                     if (sitesFile != null)
                     {

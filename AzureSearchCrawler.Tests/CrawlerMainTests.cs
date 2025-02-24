@@ -1,6 +1,7 @@
 ﻿using Xunit;
 using Moq;
 using AzureSearchCrawler.Interfaces;
+using AzureSearchCrawler.Models;
 
 namespace AzureSearchCrawler.Tests
 {
@@ -12,6 +13,7 @@ namespace AzureSearchCrawler.Tests
         private readonly StringWriter _consoleError;
         private readonly TextWriter _originalOut;
         private readonly TextWriter _originalError;
+        //private CrawlMode _crawlMode;
 
         public CrawlerMainTests()
         {
@@ -20,6 +22,7 @@ namespace AzureSearchCrawler.Tests
             _originalError = Console.Error;
             _consoleOutput = new StringWriter();
             _consoleError = new StringWriter();
+            //_crawlMode = CrawlMode.Standard;
 
             Console.SetOut(_consoleOutput);
             Console.SetError(_consoleError);
@@ -28,7 +31,7 @@ namespace AzureSearchCrawler.Tests
             _crawlerMain = new CrawlerMain(
                 (endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console) =>
                     new AzureSearchIndexer(endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console),
-                (indexer) => _crawlerMock.Object);
+                (indexer, mode, console) => _crawlerMock.Object);
 
             // Uppdatera mock setup med domSelector parameter
             _crawlerMock
