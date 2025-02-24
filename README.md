@@ -46,6 +46,7 @@ Options:
   -f, --sitesFile <sitesFile>                                Path to a JSON file containing sites to crawl
   -ds, --domSelector <domSelector>                           DOM selector to limit which links to follow (e.g.
                                                              'div.blog-container div.blog-main')
+  -v, --verbose                                              Enable verbose output [default: False]
   --version                                                  Show version information
   -?, -h, --help                                             Show help and usage information
 ```
