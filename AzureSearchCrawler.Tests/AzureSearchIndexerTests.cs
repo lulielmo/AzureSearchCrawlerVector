@@ -50,7 +50,8 @@ namespace AzureSearchCrawler.Tests
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: false,
-                console: _console);
+                console: _console,
+                enableRateLimiting: false);
 
             var searchClientField = typeof(AzureSearchIndexer)
                 .GetField("_searchClient", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -220,7 +221,8 @@ namespace AzureSearchCrawler.Tests
                 true,
                 textExtractor.Object,
                 dryRun: false,
-                console: _console);
+                console: _console, 
+                enableRateLimiting: false);
 
             var crawledPage = new CrawledPage(new Uri("http://example.com"))
             {
@@ -273,7 +275,8 @@ namespace AzureSearchCrawler.Tests
                 true,
                 _textExtractor.Object,
                 dryRun: false,
-                console: _console);
+                console: _console,
+                enableRateLimiting: false);
 
             // Sätt searchClient via reflection
             var searchClientField = typeof(AzureSearchIndexer)
@@ -314,15 +317,29 @@ namespace AzureSearchCrawler.Tests
                 true,
                 _textExtractor.Object,
                 false,
-                console: null!));
+                console: null!,
+                enableRateLimiting: false));
         }
 
         [Fact]
         public async Task PageCrawledAsync_WithNullCrawledPage_ThrowsArgumentNullException()
         {
+            var indexer = new AzureSearchIndexer(
+                "https://test.search.windows.net",
+                "test-index",
+                "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
+                true,
+                _textExtractor.Object,
+                dryRun: false,
+                console: _console,
+                enableRateLimiting: false);
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentNullException>(() =>
-                _indexer.PageCrawledAsync(null!));
+                indexer.PageCrawledAsync(null!));
         }
 
         [Fact]
@@ -379,7 +396,8 @@ namespace AzureSearchCrawler.Tests
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: false,
-                console: _console);
+                console: _console,
+                enableRateLimiting: false);
 
             // Act
             await indexer.CrawlFinishedAsync();
@@ -416,7 +434,8 @@ namespace AzureSearchCrawler.Tests
                 true,  // Detta gör att _searchClient inte initialiseras
                 _textExtractor.Object,
                 dryRun: true,  // Aktivera dry-run
-                console: testConsole);
+                console: testConsole,
+                enableRateLimiting: false);
 
             var crawledPage = new CrawledPage(new Uri("http://example.com"))
             {
@@ -656,7 +675,8 @@ namespace AzureSearchCrawler.Tests
                 true,
                 _textExtractor.Object,
                 dryRun: true,
-                console: _console);
+                console: _console,
+                enableRateLimiting: false);
 
             var content = new Dictionary<string, string>
             {
@@ -812,7 +832,8 @@ namespace AzureSearchCrawler.Tests
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: false,
-                console: new TestConsole()));
+                console: new TestConsole()
+                , enableRateLimiting: false));
 
             Assert.Equal(expectedParamName, exception.ParamName);
             Assert.Contains("Value cannot be 0.", exception.Message);
@@ -833,7 +854,8 @@ namespace AzureSearchCrawler.Tests
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: true,  // Aktivera dry-run
-                console: new TestConsole());
+                console: new TestConsole(),
+                enableRateLimiting: false);
 
             // Assert
             // Använd reflection för att kontrollera _searchClient
@@ -904,7 +926,8 @@ namespace AzureSearchCrawler.Tests
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: false,
-                console: _console);
+                console: _console, 
+                enableRateLimiting: false);
 
             var crawledPage = new CrawledPage(new Uri("http://example.com"))
             {
@@ -932,7 +955,8 @@ namespace AzureSearchCrawler.Tests
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: true,
-                console: new TestConsole());
+                console: new TestConsole(), 
+                enableRateLimiting: false);
 
             // Act
             // Anropa GetOrCreateSearchClient via reflection eftersom den är private
@@ -980,7 +1004,8 @@ namespace AzureSearchCrawler.Tests
                 extractText: true,
                 textExtractor: new TextExtractor(),
                 dryRun: false,
-                console: _console));
+                console: _console, 
+                enableRateLimiting: false));
 
             Assert.Equal("embeddingAiEndpoint", exception.ParamName);
             Assert.Contains("Value cannot be null or empty", exception.Message);
@@ -1001,7 +1026,8 @@ namespace AzureSearchCrawler.Tests
                 extractText: true,
                 textExtractor: new TextExtractor(),
                 dryRun: false,
-                console: _console));
+                console: _console,
+                enableRateLimiting: false));
 
             Assert.Equal("embeddingAiAdminApiKey", exception.ParamName);
             Assert.Contains("Value cannot be null or empty", exception.Message);
@@ -1022,7 +1048,8 @@ namespace AzureSearchCrawler.Tests
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: true,  // Sätt dryRun till true
-                console: _console);
+                console: _console, 
+                enableRateLimiting: false);
 
             // Sätt privata fält via reflection
             SetPrivateField(indexer, "_azureOpenAIClient", _aiClientMock.Object);
@@ -1049,7 +1076,8 @@ namespace AzureSearchCrawler.Tests
                 extractText: true,
                 textExtractor: new TextExtractor(),
                 dryRun: false,
-                console: _console);
+                console: _console, 
+                enableRateLimiting: false);
 
             // Act
             await indexer.CrawlFinishedAsync();
@@ -1080,7 +1108,8 @@ namespace AzureSearchCrawler.Tests
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: true,
-                console: _console);
+                console: _console, 
+                enableRateLimiting: false);
 
             var metadata = new Dictionary<string, string>
             {
@@ -1120,7 +1149,8 @@ namespace AzureSearchCrawler.Tests
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: false,
-                console: _console);
+                console: _console,
+                enableRateLimiting: false);
 
             // Act & Assert
             var exception = await Assert.ThrowsAsync<RequestFailedException>(async () =>
@@ -1172,14 +1202,6 @@ namespace AzureSearchCrawler.Tests
                     It.IsAny<IndexDocumentsOptions>(),
                     It.IsAny<CancellationToken>()),
                 Times.Never);
-        }
-
-        [Fact]
-        public async Task PageCrawledAsync_WithNullPage_ThrowsArgumentNullException()
-        {
-            // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(
-                async () => await _indexer.PageCrawledAsync(null!));
         }
 
         [Fact]
@@ -1286,7 +1308,8 @@ namespace AzureSearchCrawler.Tests
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: true,
-                console: _console);
+                console: _console, 
+                enableRateLimiting: false);
 
             // Lägg till en sida i kön
             var crawledPage = new CrawledPage(new Uri("http://example.com"))
@@ -1318,7 +1341,8 @@ namespace AzureSearchCrawler.Tests
                 extractText: true,
                 textExtractor: _textExtractor.Object,
                 dryRun: true,
-                console: _console);
+                console: _console, 
+                enableRateLimiting: false);
 
             // Fyll kön med 1000 sidor
             for (int i = 0; i < 1000; i++)
@@ -1540,7 +1564,8 @@ namespace AzureSearchCrawler.Tests
                 extractText: true,
                 textExtractor.Object,
                 dryRun: false,
-                mockConsole.Object);
+                mockConsole.Object,
+                enableRateLimiting: false);
 
             // Sätt privata fält via reflection för att injecta våra mocks
             typeof(AzureSearchIndexer)
@@ -1612,7 +1637,8 @@ namespace AzureSearchCrawler.Tests
                 extractText: true,
                 textExtractor.Object,
                 dryRun: false,
-                mockConsole.Object);
+                mockConsole.Object, 
+                enableRateLimiting: false);
 
             // Sätt privata fält via reflection
             typeof(AzureSearchIndexer)

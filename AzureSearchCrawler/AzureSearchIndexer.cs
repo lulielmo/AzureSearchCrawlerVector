@@ -1,9 +1,10 @@
 using Abot2.Poco;
 using Azure;
 using Azure.AI.OpenAI;
-using OpenAI.Embeddings;
 using Azure.Search.Documents;
 using Azure.Search.Documents.Models;
+using AzureSearchCrawler.Models;
+using OpenAI.Embeddings;
 using System.Collections.Concurrent;
 
 namespace AzureSearchCrawler
@@ -37,6 +38,8 @@ namespace AzureSearchCrawler
         private readonly BlockingCollection<WebPage> _queue = [];
         private readonly SemaphoreSlim indexingLock = new(1, 1);
 
+        private readonly RateLimiter _rateLimiter;
+
         public AzureSearchIndexer(
             string searchServiceEndpoint,
             string indexName,
@@ -48,7 +51,8 @@ namespace AzureSearchCrawler
             bool extractText,
             TextExtractor textExtractor,
             bool dryRun,
-            Interfaces.IConsole console)
+            Interfaces.IConsole console,
+            bool enableRateLimiting = true)
         {
             if (string.IsNullOrWhiteSpace(searchServiceEndpoint))
                 throw new ArgumentException("Value cannot be null or empty.", nameof(searchServiceEndpoint));
@@ -77,6 +81,8 @@ namespace AzureSearchCrawler
             _textExtractor = textExtractor;
             _dryRun = dryRun;
             _console = console ?? throw new ArgumentNullException(nameof(console));
+
+            _rateLimiter = new RateLimiter(TimeSpan.FromSeconds(4), enableRateLimiting);
 
             if (!dryRun)
             {
@@ -132,42 +138,65 @@ namespace AzureSearchCrawler
 
         public async Task PageCrawledAsync(CrawledPage crawledPage)
         {
-            ArgumentNullException.ThrowIfNull(crawledPage);
-            ArgumentNullException.ThrowIfNull(crawledPage.Uri);
-
-            var page = ExtractPageContent(crawledPage);
-            string? text = page.GetValueOrDefault("content");
-            string? title = page.GetValueOrDefault("title") ?? "Untitled page";
-
-            if (string.IsNullOrEmpty(text))
+            try
             {
-                _console.WriteInfoLine("No content for page {0}", crawledPage.Uri.AbsoluteUri);
-                return;
-            }
+                ArgumentNullException.ThrowIfNull(crawledPage);
+                ArgumentNullException.ThrowIfNull(crawledPage.Uri);
+                if (!_dryRun) ArgumentNullException.ThrowIfNull(_embeddingClient);
 
-            if (_dryRun)
-                _console.WriteLine($"[DRY RUN] Would index page: {crawledPage.Uri.AbsoluteUri}");
-            else
-            {
-                ArgumentNullException.ThrowIfNull(_embeddingClient);
+                var page = ExtractPageContent(crawledPage);
+                string? text = page.GetValueOrDefault("content");
+                string? title = page.GetValueOrDefault("title") ?? "Untitled page";
 
-                // Trunkera text till max 8000 tecken för att vara säker
-                const int maxLength = 8000;
-                string truncatedText = text.Length > maxLength ? text[..maxLength] : text;
-                string truncatedTitle = title.Length > maxLength ? title[..maxLength] : title;
+                if (string.IsNullOrEmpty(text))
+                {
+                    _console.WriteInfoLine("No content for page {0}", crawledPage.Uri.AbsoluteUri);
+                    return;
+                }
 
-                OpenAIEmbedding contentEmbedding = await _embeddingClient.GenerateEmbeddingAsync(truncatedText, _embeddingOptions);
-                OpenAIEmbedding titleEmbedding = await _embeddingClient.GenerateEmbeddingAsync(truncatedTitle, _embeddingOptions);
+                if (_dryRun)
+                    _console.WriteLine($"[DRY RUN] Would index page: {crawledPage.Uri.AbsoluteUri}");
+                else
+                {
+                    ArgumentNullException.ThrowIfNull(_embeddingClient); //Hängslen och livrem
 
-                _queue.Add(new WebPage(
+                    // Trunkera text till max 8000 tecken för att vara säker
+                    const int maxLength = 8000;
+                    string truncatedText = text.Length > maxLength ? text[..maxLength] : text;
+                    string truncatedTitle = title.Length > maxLength ? title[..maxLength] : title;
+
+                    // Vänta innan första embedding-anropet (för titel)
+                    await _rateLimiter.WaitAsync();
+                    OpenAIEmbedding titleEmbedding = await _embeddingClient.GenerateEmbeddingAsync(truncatedTitle, _embeddingOptions);
+
+                    // Vänta innan andra embedding-anropet (för innehåll)
+                    await _rateLimiter.WaitAsync();
+                    OpenAIEmbedding contentEmbedding = await _embeddingClient.GenerateEmbeddingAsync(truncatedText, _embeddingOptions);
+
+                    _queue.Add(new WebPage(
                         crawledPage.Uri.AbsoluteUri,
                         title ?? string.Empty,
-                        text, titleEmbedding.ToFloats(), contentEmbedding.ToFloats()));
-            }
+                        text, 
+                        titleEmbedding.ToFloats(), 
+                        contentEmbedding.ToFloats()));
+                }
 
-            if (_queue.Count > IndexingBatchSize)
+                if (_queue.Count > IndexingBatchSize)
+                {
+                    await IndexBatchIfNecessary();
+                }
+            }
+            catch (Exception ex)
             {
-                await IndexBatchIfNecessary();
+                _console?.WriteLine($"Error processing page {crawledPage?.Uri}: {ex.Message}", LogLevel.Error);
+                if (ex is RequestFailedException rfe && rfe.Status == 429)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5));
+                }
+                else
+                {
+                    throw;
+                }
             }
         }
 

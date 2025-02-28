@@ -560,7 +560,8 @@ namespace AzureSearchCrawler.Tests
                 true,
                 new TextExtractor(),
                 false,
-                testConsole);
+                testConsole,
+                enableRateLimiting: false);
 
             // Skapa test HTML
             var htmlContent = @"
