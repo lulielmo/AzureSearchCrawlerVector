@@ -1,13 +1,9 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-
 namespace AzureSearchCrawler
 {
 
     public class RateLimiter
     {
-        private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
+        private readonly SemaphoreSlim _semaphore = new(1, 1);
         private DateTime _lastCallTime = DateTime.MinValue;
         private readonly TimeSpan _minTimeBetweenCalls;
         private readonly bool _enabled;

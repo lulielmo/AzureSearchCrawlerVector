@@ -1,13 +1,8 @@
 using Abot2.Crawler;
 using Abot2.Poco;
 using AzureSearchCrawler.Interfaces;
-using System;
-using System.Net;
-using System.Threading.Tasks;
-using System.Threading;
-using System.Linq;
-using AngleSharp.Dom;
 using AzureSearchCrawler.Models;
+using System.Net;
 
 namespace AzureSearchCrawler
 {

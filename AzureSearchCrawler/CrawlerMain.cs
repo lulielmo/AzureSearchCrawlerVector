@@ -29,7 +29,7 @@ namespace AzureSearchCrawler
             _crawlerFactory = crawlerFactory ?? DefaultCrawlerFactory;
         }
 
-        private static ICrawler DefaultCrawlerFactory(AzureSearchIndexer indexer, CrawlMode mode, Interfaces.IConsole console)
+        internal static ICrawler DefaultCrawlerFactory(AzureSearchIndexer indexer, CrawlMode mode, Interfaces.IConsole console)
         {
             return mode switch
             {

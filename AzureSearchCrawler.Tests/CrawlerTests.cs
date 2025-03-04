@@ -11,7 +11,7 @@ namespace AzureSearchCrawler.Tests
 
     public class CrawlerTests : IDisposable
     {
-        private LogLevel _logLevel;
+        private readonly LogLevel _logLevel;
         private readonly Mock<IWebCrawler> _webCrawlerMock;
         private readonly Mock<CrawlHandler> _handlerMock;
         private readonly TestConsole _console;
@@ -36,11 +36,35 @@ namespace AzureSearchCrawler.Tests
             _crawler = new Crawler(_handlerMock.Object, _ => _webCrawlerMock.Object, _console, _logLevel);
         }
 
+        private bool _disposed = false;
+
         public void Dispose()
         {
-            Console.SetOut(_originalOut);
-            Console.SetError(_originalError);
-            _stringWriter.Dispose();
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    // Free any other managed objects here.
+                    _console.Dispose();
+                    Console.SetOut(_originalOut);
+                    Console.SetError(_originalError);
+                    _stringWriter.Dispose();
+                }
+
+                // Free any unmanaged objects here.
+                _disposed = true;
+            }
+        }
+
+        ~CrawlerTests()
+        {
+            Dispose(false);
         }
 
         [Fact]
@@ -121,9 +145,9 @@ namespace AzureSearchCrawler.Tests
             var uri = new Uri("http://example.com");
             var crawledPage = new CrawledPage(uri)
             {
-                HttpResponseMessage = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                HttpResponseMessage = new HttpResponseMessage(System.Net.HttpStatusCode.OK),
+                Content = new PageContent { Text = "Some content" }
             };
-            crawledPage.Content = new PageContent { Text = "Some content" };
 
             var crawlResult = new CrawlResult
             {

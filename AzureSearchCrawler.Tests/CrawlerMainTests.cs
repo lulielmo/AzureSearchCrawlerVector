@@ -13,7 +13,10 @@ namespace AzureSearchCrawler.Tests
         private readonly StringWriter _consoleError;
         private readonly TextWriter _originalOut;
         private readonly TextWriter _originalError;
-        //private CrawlMode _crawlMode;
+        private readonly Mock<IConsole> _consoleMock;
+
+        private readonly Mock<TextExtractor> _textExtractorMock;
+        
 
         public CrawlerMainTests()
         {
@@ -22,7 +25,8 @@ namespace AzureSearchCrawler.Tests
             _originalError = Console.Error;
             _consoleOutput = new StringWriter();
             _consoleError = new StringWriter();
-            //_crawlMode = CrawlMode.Standard;
+            _consoleMock = new Mock<Interfaces.IConsole>();
+            _textExtractorMock = new Mock<TextExtractor>();
 
             Console.SetOut(_consoleOutput);
             Console.SetError(_consoleError);
@@ -557,6 +561,91 @@ namespace AzureSearchCrawler.Tests
             {
                 File.Delete(tempFile);
             }
+        }
+
+        [Fact]
+        public void DefaultCrawlerFactory_WithSitemapMode_ReturnsSitemapCrawler()
+        {
+            // Arrange
+            var indexerMock = new Mock<AzureSearchIndexer>(
+                "https://test.search.windows.net",
+                "test-index",
+                "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
+                false,
+                _textExtractorMock.Object,
+                false,
+                _consoleMock.Object,
+                false);
+
+            // Act
+            var crawler = CrawlerMain.DefaultCrawlerFactory(
+                indexerMock.Object, 
+                CrawlMode.Sitemap, 
+                _consoleMock.Object);
+
+            // Assert
+            Assert.IsType<SitemapCrawler>(crawler);
+        }
+
+        [Fact]
+        public void DefaultCrawlerFactory_WithStandardMode_ReturnsCrawler()
+        {
+            // Arrange
+            var indexerMock = new Mock<AzureSearchIndexer>(
+                "https://test.search.windows.net",
+                "test-index",
+                "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
+                false,
+                _textExtractorMock.Object,
+                false,
+                _consoleMock.Object,
+                false);
+
+            // Act
+            var crawler = CrawlerMain.DefaultCrawlerFactory(
+                indexerMock.Object, 
+                CrawlMode.Standard, 
+                _consoleMock.Object);
+
+            // Assert
+            Assert.IsType<Crawler>(crawler);
+        }
+
+        [Fact]
+        public void DefaultCrawlerFactory_WithInvalidMode_ThrowsArgumentException()
+        {
+            // Arrange
+            var indexerMock = new Mock<AzureSearchIndexer>(
+                "https://test.search.windows.net",
+                "test-index",
+                "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
+                false,
+                _textExtractorMock.Object,
+                false,
+                _consoleMock.Object,
+                false);
+
+            // Act & Assert
+            var exception = Assert.Throws<ArgumentException>(() => 
+                CrawlerMain.DefaultCrawlerFactory(
+                    indexerMock.Object, 
+                    (CrawlMode)999, 
+                    _consoleMock.Object));
+            
+            Assert.Equal("mode", exception.ParamName);
+            Assert.Contains("Unsupported crawl mode", exception.Message);
         }
     }
 }
