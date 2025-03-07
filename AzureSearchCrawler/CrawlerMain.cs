@@ -34,7 +34,7 @@ namespace AzureSearchCrawler
             return mode switch
             {
                 CrawlMode.Sitemap => new SitemapCrawler(indexer, console),
-                CrawlMode.Standard => new Crawler(indexer, console),
+                CrawlMode.Standard => new AbotCrawler(indexer, console),
                 CrawlMode.Headless => new HeadlessBrowserCrawler(indexer, console),
                 _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", nameof(mode))
             };

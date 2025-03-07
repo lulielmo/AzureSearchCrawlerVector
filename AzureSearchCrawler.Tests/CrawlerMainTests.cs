@@ -639,7 +639,7 @@ namespace AzureSearchCrawler.Tests
                 _consoleMock.Object);
 
             // Assert
-            Assert.IsType<Crawler>(crawler);
+            Assert.IsType<AbotCrawler>(crawler);
         }
 
         [Fact]

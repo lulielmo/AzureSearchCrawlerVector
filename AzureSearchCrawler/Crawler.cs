@@ -10,7 +10,7 @@ namespace AzureSearchCrawler
     ///  A convenience wrapper for an Abot crawler with a reasonable default configuration and console logging.
     ///  The actual action to be performed on the crawled pages is passed in as a ICrawledPageProcessor.
     /// </summary>
-    public class Crawler : IWebCrawlingStrategy
+    public class AbotCrawler : IWebCrawlingStrategy
     {
         private static int PageCount = 0;
 
@@ -19,12 +19,12 @@ namespace AzureSearchCrawler
         private readonly IConsole _console;
         private readonly LogLevel _logLevel;
 
-        public Crawler(ICrawledPageProcessor processor, IConsole console, LogLevel logLevel = LogLevel.Information)
+        public AbotCrawler(ICrawledPageProcessor processor, IConsole console, LogLevel logLevel = LogLevel.Information)
             : this(processor, config => new PoliteWebCrawler(config), console, logLevel)
         {
         }
 
-        public Crawler(ICrawledPageProcessor processor, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, IConsole console, LogLevel logLevel)
+        public AbotCrawler(ICrawledPageProcessor processor, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, IConsole console, LogLevel logLevel)
         {
             _processor = processor ?? throw new ArgumentNullException(nameof(processor));
             _webCrawlerFactory = crawlerFactory ?? throw new ArgumentNullException(nameof(crawlerFactory));

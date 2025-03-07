@@ -10,18 +10,18 @@ using Xunit;
 namespace AzureSearchCrawler.Tests
 {
 
-    public class CrawlerTests : IDisposable
+    public class AbotCrawlerTests : IDisposable
     {
         private readonly LogLevel _logLevel;
         private readonly Mock<IWebCrawler> _webCrawlerMock;
         private readonly Mock<ICrawledPageProcessor> _handlerMock;
         private readonly TestConsole _console;
-        private readonly Crawler _crawler;
+        private readonly AbotCrawler _crawler;
         private readonly StringWriter _stringWriter;
         private readonly TextWriter _originalOut;
         private readonly TextWriter _originalError;
 
-        public CrawlerTests()
+        public AbotCrawlerTests()
         {
             _logLevel = new LogLevel();
             _webCrawlerMock = new Mock<IWebCrawler>();
@@ -34,7 +34,7 @@ namespace AzureSearchCrawler.Tests
             Console.SetOut(_stringWriter);
             Console.SetError(_stringWriter);
 
-            _crawler = new Crawler(_handlerMock.Object, _ => _webCrawlerMock.Object, _console, _logLevel);
+            _crawler = new AbotCrawler(_handlerMock.Object, _ => _webCrawlerMock.Object, _console, _logLevel);
         }
 
         private bool _disposed = false;
@@ -63,7 +63,7 @@ namespace AzureSearchCrawler.Tests
             }
         }
 
-        ~CrawlerTests()
+        ~AbotCrawlerTests()
         {
             Dispose(false);
         }
@@ -363,7 +363,7 @@ namespace AzureSearchCrawler.Tests
                     CrawlContext = new CrawlContext()
                 });
 
-            var crawler = new Crawler(_handlerMock.Object, config =>
+            var crawler = new AbotCrawler(_handlerMock.Object, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
@@ -388,7 +388,7 @@ namespace AzureSearchCrawler.Tests
             // Arrange
             var uri = new Uri("http://example.com");
             var testConsole = new TestConsole();
-            var crawler = new Crawler(_handlerMock.Object, config =>
+            var crawler = new AbotCrawler(_handlerMock.Object, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
@@ -486,7 +486,7 @@ namespace AzureSearchCrawler.Tests
             LogLevel logLevel = LogLevel.Information;
             var uri = new Uri("http://example.com");
             var testConsole = new TestConsole();
-            var crawler = new Crawler(_handlerMock.Object, config =>
+            var crawler = new AbotCrawler(_handlerMock.Object, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
@@ -531,7 +531,7 @@ namespace AzureSearchCrawler.Tests
             LogLevel logLevel = LogLevel.Information;
             var uri = new Uri("http://example.com");
             var testConsole = new TestConsole();
-            var crawler = new Crawler(_handlerMock.Object, config =>
+            var crawler = new AbotCrawler(_handlerMock.Object, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
@@ -633,7 +633,7 @@ namespace AzureSearchCrawler.Tests
                     CrawlContext = new CrawlContext()
                 });
 
-            var crawler = new Crawler(indexer, config =>
+            var crawler = new AbotCrawler(indexer, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
@@ -701,7 +701,7 @@ namespace AzureSearchCrawler.Tests
                     CrawlContext = new CrawlContext()
                 });
 
-            var crawler = new Crawler(_handlerMock.Object, config =>
+            var crawler = new AbotCrawler(_handlerMock.Object, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
@@ -722,7 +722,7 @@ namespace AzureSearchCrawler.Tests
             var testConsole = new TestConsole();
             testConsole.SetVerbose(false);
             
-            var crawler = new Crawler(_handlerMock.Object, config =>
+            var crawler = new AbotCrawler(_handlerMock.Object, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
