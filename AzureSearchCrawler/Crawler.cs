@@ -1,4 +1,3 @@
-using Abot2;
 using Abot2.Crawler;
 using Abot2.Poco;
 using AzureSearchCrawler.Interfaces;
@@ -9,25 +8,25 @@ namespace AzureSearchCrawler
 {
     /// <summary>
     ///  A convenience wrapper for an Abot crawler with a reasonable default configuration and console logging.
-    ///  The actual action to be performed on the crawled pages is passed in as a ICrawlHandler.
+    ///  The actual action to be performed on the crawled pages is passed in as a ICrawledPageProcessor.
     /// </summary>
-    public class Crawler : ICrawler
+    public class Crawler : IWebCrawlingStrategy
     {
         private static int PageCount = 0;
 
-        private readonly ICrawlHandler _handler;
+        private readonly ICrawledPageProcessor _processor;
         private readonly Func<CrawlConfiguration, IWebCrawler> _webCrawlerFactory;
-        private readonly Interfaces.IConsole _console;
+        private readonly IConsole _console;
         private readonly LogLevel _logLevel;
 
-        public Crawler(ICrawlHandler handler, Interfaces.IConsole console, LogLevel logLevel = LogLevel.Information)
-            : this(handler, config => new PoliteWebCrawler(config), console, logLevel)
+        public Crawler(ICrawledPageProcessor processor, IConsole console, LogLevel logLevel = LogLevel.Information)
+            : this(processor, config => new PoliteWebCrawler(config), console, logLevel)
         {
         }
 
-        public Crawler(ICrawlHandler handler, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, Interfaces.IConsole console, LogLevel logLevel)
+        public Crawler(ICrawledPageProcessor processor, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, IConsole console, LogLevel logLevel)
         {
-            _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+            _processor = processor ?? throw new ArgumentNullException(nameof(processor));
             _webCrawlerFactory = crawlerFactory ?? throw new ArgumentNullException(nameof(crawlerFactory));
             _console = console ?? throw new ArgumentNullException(nameof(console));
             _logLevel = logLevel;
@@ -84,7 +83,7 @@ namespace AzureSearchCrawler
                     _console.WriteError($"Error: {result.ErrorException.Message}");
                 }
 
-                await _handler.CrawlFinishedAsync();
+                await _processor.CrawlFinishedAsync();
             }
             finally
             {
@@ -121,7 +120,7 @@ namespace AzureSearchCrawler
                 return;
             }
 
-            await _handler.PageCrawledAsync(crawledPage);
+            await _processor.PageCrawledAsync(crawledPage);
         }
 
         private static CrawlConfiguration CreateCrawlConfiguration(int maxPages, int maxDepth)

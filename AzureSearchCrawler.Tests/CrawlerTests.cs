@@ -1,12 +1,11 @@
-﻿using Abot2;
-using Abot2.Crawler;
+﻿using Abot2.Crawler;
 using Abot2.Poco;
-using AzureSearchCrawler.Models;
+using AngleSharp;
+using AngleSharp.Html.Parser;
 using AzureSearchCrawler.Interfaces;
+using AzureSearchCrawler.Models;
 using Moq;
 using Xunit;
-using AngleSharp.Html.Parser;
-using AngleSharp;
 
 namespace AzureSearchCrawler.Tests
 {
@@ -15,7 +14,7 @@ namespace AzureSearchCrawler.Tests
     {
         private readonly LogLevel _logLevel;
         private readonly Mock<IWebCrawler> _webCrawlerMock;
-        private readonly Mock<ICrawlHandler> _handlerMock;
+        private readonly Mock<ICrawledPageProcessor> _handlerMock;
         private readonly TestConsole _console;
         private readonly Crawler _crawler;
         private readonly StringWriter _stringWriter;
@@ -26,7 +25,7 @@ namespace AzureSearchCrawler.Tests
         {
             _logLevel = new LogLevel();
             _webCrawlerMock = new Mock<IWebCrawler>();
-            _handlerMock = new Mock<ICrawlHandler>();
+            _handlerMock = new Mock<ICrawledPageProcessor>();
             _console = new TestConsole();
             _stringWriter = new StringWriter();
             _originalOut = Console.Out;

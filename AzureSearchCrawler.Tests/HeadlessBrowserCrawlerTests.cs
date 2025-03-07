@@ -9,7 +9,7 @@ namespace AzureSearchCrawler.Tests
 {
     public class HeadlessBrowserCrawlerTests : IDisposable
     {
-        private readonly Mock<ICrawlHandler> _handlerMock;
+        private readonly Mock<ICrawledPageProcessor> _handlerMock;
         private readonly Mock<IPlaywright> _playwrightMock;
         private readonly Mock<IBrowser> _browserMock;
         private readonly Mock<IBrowserContext> _contextMock;
@@ -20,7 +20,7 @@ namespace AzureSearchCrawler.Tests
 
         public HeadlessBrowserCrawlerTests()
         {
-            _handlerMock = new Mock<ICrawlHandler>();
+            _handlerMock = new Mock<ICrawledPageProcessor>();
             _playwrightMock = new Mock<IPlaywright>();
             _browserMock = new Mock<IBrowser>();
             _contextMock = new Mock<IBrowserContext>();
@@ -288,6 +288,12 @@ namespace AzureSearchCrawler.Tests
             // Assert
             _pageMock.Verify(p => p.GotoAsync(It.Is<string>(url => url.TrimEnd('/') == rootUrl.TrimEnd('/')), It.IsAny<PageGotoOptions>()), Times.Once);
             
+            // Debug: Skriv ut alla loggade meddelanden
+            foreach (var msg in loggedMessages)
+            {
+                _console.WriteLine($"DEBUG - Logged message: '{msg.Message}' at level {msg.Level}");
+            }
+
             // Verify all expected log messages
             Assert.Contains(loggedMessages, m => m.Message == $"Crawling {rootUrl}/" && m.Level == LogLevel.Debug);
             Assert.Contains(loggedMessages, m => m.Message == $"Checking links against selector '{domSelector}'" && m.Level == LogLevel.Verbose);

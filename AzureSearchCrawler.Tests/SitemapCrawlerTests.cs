@@ -13,14 +13,14 @@ namespace AzureSearchCrawler.Tests
     /// </summary>
     public class SitemapCrawlerTests
     {
-        private readonly Mock<ICrawlHandler> _handlerMock;
+        private readonly Mock<ICrawledPageProcessor> _handlerMock;
         private readonly Mock<IConsole> _consoleMock;
         private readonly Mock<HttpMessageHandler> _httpHandlerMock;
         private readonly HttpClient _httpClient;
 
         public SitemapCrawlerTests()
         {
-            _handlerMock = new Mock<ICrawlHandler>();
+            _handlerMock = new Mock<ICrawledPageProcessor>();
             _consoleMock = new Mock<IConsole>();
             _httpHandlerMock = new Mock<HttpMessageHandler>();
             _httpClient = new HttpClient(_httpHandlerMock.Object);

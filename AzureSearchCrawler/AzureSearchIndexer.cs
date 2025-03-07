@@ -2,23 +2,20 @@ using Abot2.Poco;
 using Azure;
 using Azure.AI.OpenAI;
 using Azure.Search.Documents;
-using Azure.Search.Documents.Indexes;
-using Azure.Search.Documents.Indexes.Models;
 using Azure.Search.Documents.Models;
 using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
 using OpenAI.Embeddings;
 using System.Collections.Concurrent;
-using System.Text.RegularExpressions;
 
 namespace AzureSearchCrawler
 {
     /// <summary>
-    /// A ICrawlHandler that indexes crawled pages into Azure Search. Pages are represented by the nested WebPage class.
+    /// A ICrawledPageProcessor that indexes crawled pages into Azure Search. Pages are represented by the nested WebPage class.
     /// <para/>To customize what text is extracted and indexed from each page, you implement a custom TextExtractor
     /// and pass it in.
     /// </summary>
-    public partial class AzureSearchIndexer : ICrawlHandler
+    public partial class AzureSearchIndexer : ICrawledPageProcessor
     {
         internal const int IndexingBatchSize = 10;
 

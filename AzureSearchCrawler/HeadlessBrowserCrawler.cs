@@ -1,28 +1,27 @@
-using Microsoft.Playwright;
+using Abot2.Poco;
 using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
-using Abot2.Poco;
-using System.Net;
+using Microsoft.Playwright;
 
 namespace AzureSearchCrawler
 {
-    public class HeadlessBrowserCrawler : ICrawler, IDisposable
+    public class HeadlessBrowserCrawler : IWebCrawlingStrategy, IDisposable
     {
-        private readonly ICrawlHandler _handler;
+        private readonly ICrawledPageProcessor _processor;
         private readonly IConsole _console;
         private readonly IPlaywright _playwright;
         private readonly IBrowser _browser;
         private readonly HashSet<string> _visitedUrls;
         private readonly bool _ownsPlaywright;
 
-        public HeadlessBrowserCrawler(ICrawlHandler handler, IConsole console)
-            : this(handler, console, Playwright.CreateAsync().GetAwaiter().GetResult(), true)
+        public HeadlessBrowserCrawler(ICrawledPageProcessor processor, IConsole console)
+            : this(processor, console, Playwright.CreateAsync().GetAwaiter().GetResult(), true)
         {
         }
 
-        internal HeadlessBrowserCrawler(ICrawlHandler handler, IConsole console, IPlaywright playwright, bool ownsPlaywright = false)
+        internal HeadlessBrowserCrawler(ICrawledPageProcessor processor, IConsole console, IPlaywright playwright, bool ownsPlaywright = false)
         {
-            _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+            _processor = processor ?? throw new ArgumentNullException(nameof(processor));
             _console = console ?? throw new ArgumentNullException(nameof(console));
             _playwright = playwright ?? throw new ArgumentNullException(nameof(playwright));
             _ownsPlaywright = ownsPlaywright;
@@ -118,7 +117,7 @@ namespace AzureSearchCrawler
                     HttpResponseMessage = new HttpResponseMessage((System.Net.HttpStatusCode)response.Status)
                 };
 
-                await _handler.PageCrawledAsync(crawledPage);
+                await _processor.PageCrawledAsync(crawledPage);
 
                 if (currentDepth < maxDepth && _visitedUrls.Count < maxPages)
                 {

@@ -6,9 +6,9 @@ using System.Xml.Linq;
 
 namespace AzureSearchCrawler
 {
-    public class SitemapCrawler : ICrawler
+    public class SitemapCrawler : IWebCrawlingStrategy
     {
-        private readonly ICrawlHandler _handler;
+        private readonly ICrawledPageProcessor _processor;
         private readonly IConsole _console;
         //private readonly LogLevel _logLevel;
         private readonly HttpClient _httpClient;
@@ -24,9 +24,9 @@ namespace AzureSearchCrawler
         "/robots.txt"  // Vi kollar robots.txt först för att hitta sitemap-URL
     ];
 
-        public SitemapCrawler(ICrawlHandler handler, IConsole console, LogLevel logLevel = LogLevel.Information, HttpClient? httpClient = null)
+        public SitemapCrawler(ICrawledPageProcessor processor, IConsole console, LogLevel logLevel = LogLevel.Information, HttpClient? httpClient = null)
         {
-            _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+            _processor = processor ?? throw new ArgumentNullException(nameof(processor));
             _console = console ?? throw new ArgumentNullException(nameof(console));
             //_logLevel = logLevel; //TODO: Make use of this setting
             _httpClient = httpClient ?? new HttpClient();
@@ -156,7 +156,7 @@ namespace AzureSearchCrawler
                     {
                         Content = new PageContent { Text = pageContent }
                     };
-                    await _handler.PageCrawledAsync(crawledPage);
+                    await _processor.PageCrawledAsync(crawledPage);
                     _processedPages++;
                 }
                 catch (Exception ex)
@@ -212,7 +212,7 @@ namespace AzureSearchCrawler
                         continue;
                     }
 
-                    await _handler.CrawlFinishedAsync();
+                    await _processor.CrawlFinishedAsync();
                     return;
                 }
                 catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)

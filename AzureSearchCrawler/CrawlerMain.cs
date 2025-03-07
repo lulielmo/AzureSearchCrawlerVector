@@ -17,19 +17,19 @@ namespace AzureSearchCrawler
         private const int DefaultMaxPagesToIndex = 100;
         private const int DefaultMaxCrawlDepth = 10;
         private readonly Func<string, string, string, string, string, string, int, bool, TextExtractor, bool, Interfaces.IConsole, AzureSearchIndexer> _indexerFactory;
-        private readonly Func<AzureSearchIndexer, CrawlMode, Interfaces.IConsole, ICrawler> _crawlerFactory;
+        private readonly Func<AzureSearchIndexer, CrawlMode, Interfaces.IConsole, IWebCrawlingStrategy> _crawlerFactory;
 
         private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
         public CrawlerMain(
             Func<string, string, string, string, string, string, int, bool, TextExtractor, bool, Interfaces.IConsole, AzureSearchIndexer>? indexerFactory = null,
-            Func<AzureSearchIndexer, CrawlMode, Interfaces.IConsole, ICrawler>? crawlerFactory = null)
+            Func<AzureSearchIndexer, CrawlMode, Interfaces.IConsole, IWebCrawlingStrategy>? crawlerFactory = null)
         {
             _indexerFactory = indexerFactory ?? DefaultIndexerFactory;
             _crawlerFactory = crawlerFactory ?? DefaultCrawlerFactory;
         }
 
-        internal static ICrawler DefaultCrawlerFactory(AzureSearchIndexer indexer, CrawlMode mode, Interfaces.IConsole console)
+        internal static IWebCrawlingStrategy DefaultCrawlerFactory(AzureSearchIndexer indexer, CrawlMode mode, Interfaces.IConsole console)
         {
             return mode switch
             {

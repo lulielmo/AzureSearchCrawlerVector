@@ -7,7 +7,7 @@ namespace AzureSearchCrawler.Tests
 {
     public class CrawlerMainTests : IDisposable
     {
-        private readonly Mock<ICrawler> _crawlerMock;
+        private readonly Mock<IWebCrawlingStrategy> _crawlerMock;
         private readonly CrawlerMain _crawlerMain;
         private readonly StringWriter _consoleOutput;
         private readonly StringWriter _consoleError;
@@ -20,7 +20,7 @@ namespace AzureSearchCrawler.Tests
 
         public CrawlerMainTests()
         {
-            _crawlerMock = new Mock<ICrawler>();
+            _crawlerMock = new Mock<IWebCrawlingStrategy>();
             _originalOut = Console.Out;
             _originalError = Console.Error;
             _consoleOutput = new StringWriter();
