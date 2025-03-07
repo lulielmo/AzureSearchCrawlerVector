@@ -10,25 +10,25 @@ namespace AzureSearchCrawler
     {
         private readonly CrawlHandler _handler;
         private readonly IConsole _console;
-        private readonly LogLevel _logLevel;
+        //private readonly LogLevel _logLevel;
         private readonly HttpClient _httpClient;
         private int _processedPages;
         private readonly HashSet<string> _processedSitemaps;
 
-        private static readonly string[] SITEMAP_PATHS = new[]
-        {
+        private static readonly string[] SITEMAP_PATHS =
+        [
         "/sitemap.xml",
         "/sitemap_index.xml",
         "/sitemaps/sitemap.xml",
         "/sitemap/sitemap.xml",
         "/robots.txt"  // Vi kollar robots.txt först för att hitta sitemap-URL
-    };
+    ];
 
-        public SitemapCrawler(CrawlHandler handler, IConsole console, LogLevel logLevel = LogLevel.Info, HttpClient? httpClient = null)
+        public SitemapCrawler(CrawlHandler handler, IConsole console, LogLevel logLevel = LogLevel.Information, HttpClient? httpClient = null)
         {
             _handler = handler ?? throw new ArgumentNullException(nameof(handler));
             _console = console ?? throw new ArgumentNullException(nameof(console));
-            _logLevel = logLevel;
+            //_logLevel = logLevel; //TODO: Make use of this setting
             _httpClient = httpClient ?? new HttpClient();
             _processedSitemaps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             
@@ -38,7 +38,7 @@ namespace AzureSearchCrawler
             }
         }
 
-        private Uri ResolveUrl(Uri baseUri, string url)
+        private static Uri ResolveUrl(Uri baseUri, string url)
         {
             if (Uri.TryCreate(url, UriKind.Absolute, out var absoluteUri))
             {
@@ -47,7 +47,7 @@ namespace AzureSearchCrawler
 
             // Hantera relativa URLs som börjar med / eller ./ eller ../
             url = url.TrimStart('.');
-            if (!url.StartsWith("/"))
+            if (!url.StartsWith('/'))
             {
                 url = "/" + url;
             }
@@ -68,7 +68,7 @@ namespace AzureSearchCrawler
             {
                 if (_processedPages >= maxPages)
                 {
-                    _console.WriteLine($"Reached maximum pages limit ({maxPages})", LogLevel.Info);
+                    _console.WriteLine($"Reached maximum pages limit ({maxPages})", LogLevel.Information);
                     break;
                 }
 
@@ -121,7 +121,7 @@ namespace AzureSearchCrawler
             {
                 if (_processedPages >= maxPages)
                 {
-                    _console.WriteLine($"Reached maximum pages limit ({maxPages})", LogLevel.Info);
+                    _console.WriteLine($"Reached maximum pages limit ({maxPages})", LogLevel.Information);
                     break;
                 }
 
@@ -187,7 +187,7 @@ namespace AzureSearchCrawler
                         if (sitemapLine != null)
                         {
                             var actualSitemapUrl = sitemapLine.Split(':', 2)[1].Trim();
-                            _console.WriteLine($"Found sitemap URL in robots.txt: {actualSitemapUrl}", LogLevel.Info);
+                            _console.WriteLine($"Found sitemap URL in robots.txt: {actualSitemapUrl}", LogLevel.Information);
                             sitemapUrl = new Uri(actualSitemapUrl);
                         }
                     }

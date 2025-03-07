@@ -35,6 +35,7 @@ namespace AzureSearchCrawler
             {
                 CrawlMode.Sitemap => new SitemapCrawler(indexer, console),
                 CrawlMode.Standard => new Crawler(indexer, console),
+                CrawlMode.Headless => new HeadlessBrowserCrawler(indexer, console),
                 _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", nameof(mode))
             };
         }
@@ -191,7 +192,7 @@ namespace AzureSearchCrawler
                     var azureOpenAIEmbeddingDimensions = context.ParseResult.GetValueForOption(azureOpenAIEmbeddingDimensionsOption);
                     var verbose = context.ParseResult.GetValueForOption(verboseOption);
                     var mode = context.ParseResult.GetValueForOption(modeOption);
-                    var logLevel = verbose ? LogLevel.Verbose : LogLevel.Info;
+                    var logLevel = verbose ? LogLevel.Verbose : LogLevel.Information;
 
                     console.WriteLine($"Verbose mode: {verbose}");  // Debug-utskrift
                     console.WriteLine($"Crawl mode: {mode}");      // Debug-utskrift

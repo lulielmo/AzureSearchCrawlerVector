@@ -81,7 +81,7 @@ namespace AzureSearchCrawler.Tests
             // Assert
             _consoleMock.Verify(c => c.WriteLine(
                 It.Is<string>(s => s.Contains("Found sitemap URL in robots.txt")), 
-                LogLevel.Info));
+                LogLevel.Information));
             _handlerMock.Verify(h => h.PageCrawledAsync(It.IsAny<CrawledPage>()), Times.Once);
         }
 

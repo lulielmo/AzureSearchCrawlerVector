@@ -4,7 +4,7 @@ namespace AzureSearchCrawler.Models
     {
         Verbose,    // Mest detaljerad nivå
         Debug,      // För utvecklare
-        Info,       // Normal information
+        Information,
         Warning,    // Potentiella problem
         Error       // Faktiska fel
     } 

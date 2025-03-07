@@ -34,6 +34,8 @@ public class TestConsole : System.CommandLine.IConsole, AzureSearchCrawler.Inter
     private readonly List<string> _errors = new();
     private bool _verbose;
 
+    public event Action<string, LogLevel>? LoggedMessage;
+
     public IReadOnlyList<string> Output => _output;
     public IReadOnlyList<string> Errors => _errors;
 
@@ -49,8 +51,9 @@ public class TestConsole : System.CommandLine.IConsole, AzureSearchCrawler.Inter
         Error = new TestStandardStreamWriter(_errors);
     }
 
-    public void WriteLine(string message, LogLevel level = LogLevel.Info)
+    public void WriteLine(string message, LogLevel level = LogLevel.Information)
     {
+        LoggedMessage?.Invoke(message, level);
         switch (level)
         {
             case LogLevel.Error:
@@ -82,7 +85,7 @@ public class TestConsole : System.CommandLine.IConsole, AzureSearchCrawler.Inter
         Out.Write(string.Format(format, args) + Environment.NewLine);
 
     public void WriteInfoLine(string format, params object[] args)
-        => WriteLine(string.Format(format, args), LogLevel.Info);
+        => WriteLine(string.Format(format, args), LogLevel.Information);
 
     public void WriteDebugLine(string format, params object[] args)
         => WriteLine(string.Format(format, args), LogLevel.Debug);
@@ -91,7 +94,9 @@ public class TestConsole : System.CommandLine.IConsole, AzureSearchCrawler.Inter
         => WriteLine(string.Format(format, args), LogLevel.Verbose);
 
     public void WriteWarningLine(string message, params object[] args)
-        => WriteLine(string.Format(message, args), LogLevel.Warning);
+    {
+        WriteLine(string.Format(message, args), LogLevel.Warning);
+    }
 
     public void SetVerbose(bool verbose) => _verbose = verbose;
 
@@ -99,6 +104,4 @@ public class TestConsole : System.CommandLine.IConsole, AzureSearchCrawler.Inter
     {
         // Inget att städa upp
     }
-
-    
 }

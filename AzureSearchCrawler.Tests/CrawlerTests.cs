@@ -482,7 +482,7 @@ namespace AzureSearchCrawler.Tests
         public async Task CrawlAsync_LogsCorrectMessages(int maxPages, int maxDepth)
         {
             // Arrange
-            LogLevel logLevel = LogLevel.Info;
+            LogLevel logLevel = LogLevel.Information;
             var uri = new Uri("http://example.com");
             var testConsole = new TestConsole();
             var crawler = new Crawler(_handlerMock.Object, config =>
@@ -527,7 +527,7 @@ namespace AzureSearchCrawler.Tests
         public async Task CrawlAsync_WithValidUri_LogsProgress()
         {
             // Arrange
-            LogLevel logLevel = LogLevel.Info;
+            LogLevel logLevel = LogLevel.Information;
             var uri = new Uri("http://example.com");
             var testConsole = new TestConsole();
             var crawler = new Crawler(_handlerMock.Object, config =>
@@ -725,7 +725,7 @@ namespace AzureSearchCrawler.Tests
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
-            }, testConsole, LogLevel.Info);
+            }, testConsole, LogLevel.Information);
 
             var crawlResult = new CrawlResult
             {

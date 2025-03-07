@@ -43,12 +43,35 @@ namespace AzureSearchCrawler.Tests
                 .Returns(Task.CompletedTask);
         }
 
+        private bool _disposed = false;
+
         public void Dispose()
         {
-            Console.SetOut(_originalOut);
-            Console.SetError(_originalError);
-            _consoleOutput.Dispose();
-            _consoleError.Dispose();
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    // Free any other managed objects here.
+                    Console.SetOut(_originalOut);
+                    Console.SetError(_originalError);
+                    _consoleOutput.Dispose();
+                    _consoleError.Dispose();
+                }
+
+                // Free any unmanaged objects here.
+                _disposed = true;
+            }
+        }
+
+        ~CrawlerMainTests()
+        {
+            Dispose(false);
         }
 
         [Fact]

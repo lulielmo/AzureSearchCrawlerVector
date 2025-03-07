@@ -4,7 +4,7 @@ namespace AzureSearchCrawler.Interfaces
 {
     public interface IConsole
     {
-        void WriteLine(string message, LogLevel level = LogLevel.Info);
+        void WriteLine(string message, LogLevel level = LogLevel.Information);
 
         void WriteInfoLine(string format, params object[] args);
 

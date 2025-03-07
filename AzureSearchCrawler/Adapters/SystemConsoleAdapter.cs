@@ -14,7 +14,7 @@ public class SystemConsoleAdapter : Interfaces.IConsole
         _console = console;
     }
 
-    public void WriteLine(string message, LogLevel level = LogLevel.Info)
+    public void WriteLine(string message, LogLevel level = LogLevel.Information)
     {
         switch (level)
         {
@@ -42,7 +42,7 @@ public class SystemConsoleAdapter : Interfaces.IConsole
         => WriteLine(message, LogLevel.Error);
 
     public void WriteInfoLine(string format, params object[] args)
-        => WriteLine(format, LogLevel.Info, args);
+        => WriteLine(format, LogLevel.Information, args);
 
     public void WriteDebugLine(string format, params object[] args)
         => WriteLine(format, LogLevel.Debug, args);

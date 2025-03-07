@@ -19,7 +19,7 @@ namespace AzureSearchCrawler
         private readonly Interfaces.IConsole _console;
         private readonly LogLevel _logLevel;
 
-        public Crawler(CrawlHandler handler, Interfaces.IConsole console, LogLevel logLevel = LogLevel.Info)
+        public Crawler(CrawlHandler handler, Interfaces.IConsole console, LogLevel logLevel = LogLevel.Information)
             : this(handler, config => new PoliteWebCrawler(config), console, logLevel)
         {
         }
@@ -142,7 +142,7 @@ namespace AzureSearchCrawler
             return crawlConfig;
         }
 
-        private void LogMessage(string message, LogLevel level = LogLevel.Info)
+        private void LogMessage(string message, LogLevel level = LogLevel.Information)
         {
             if (level <= _logLevel)
                 _console.WriteLine(message, level);
