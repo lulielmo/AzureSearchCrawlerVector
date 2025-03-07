@@ -2,19 +2,23 @@ using Abot2.Poco;
 using Azure;
 using Azure.AI.OpenAI;
 using Azure.Search.Documents;
+using Azure.Search.Documents.Indexes;
+using Azure.Search.Documents.Indexes.Models;
 using Azure.Search.Documents.Models;
+using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
 using OpenAI.Embeddings;
 using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 
 namespace AzureSearchCrawler
 {
     /// <summary>
-    /// A CrawlHandler that indexes crawled pages into Azure Search. Pages are represented by the nested WebPage class.
+    /// A ICrawlHandler that indexes crawled pages into Azure Search. Pages are represented by the nested WebPage class.
     /// <para/>To customize what text is extracted and indexed from each page, you implement a custom TextExtractor
     /// and pass it in.
     /// </summary>
-    public partial class AzureSearchIndexer : CrawlHandler
+    public partial class AzureSearchIndexer : ICrawlHandler
     {
         internal const int IndexingBatchSize = 10;
 
@@ -28,7 +32,7 @@ namespace AzureSearchCrawler
         private readonly bool _extractText;
         private readonly TextExtractor _textExtractor;
         private readonly bool _dryRun;
-        private readonly Interfaces.IConsole _console;
+        private readonly IConsole _console;
         private SearchClient? _searchClient;
 
         private AzureOpenAIClient? _azureOpenAIClient;
@@ -51,7 +55,7 @@ namespace AzureSearchCrawler
             bool extractText,
             TextExtractor textExtractor,
             bool dryRun,
-            Interfaces.IConsole console,
+            IConsole console,
             bool enableRateLimiting = true)
         {
             if (string.IsNullOrWhiteSpace(searchServiceEndpoint))

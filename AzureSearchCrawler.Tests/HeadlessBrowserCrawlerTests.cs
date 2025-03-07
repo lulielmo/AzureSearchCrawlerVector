@@ -1,5 +1,6 @@
 using Abot2.Poco;
 using AzureSearchCrawler.Models;
+using AzureSearchCrawler.Interfaces;
 using Microsoft.Playwright;
 using Moq;
 using Xunit;
@@ -8,7 +9,7 @@ namespace AzureSearchCrawler.Tests
 {
     public class HeadlessBrowserCrawlerTests : IDisposable
     {
-        private readonly Mock<CrawlHandler> _handlerMock;
+        private readonly Mock<ICrawlHandler> _handlerMock;
         private readonly Mock<IPlaywright> _playwrightMock;
         private readonly Mock<IBrowser> _browserMock;
         private readonly Mock<IBrowserContext> _contextMock;
@@ -19,7 +20,7 @@ namespace AzureSearchCrawler.Tests
 
         public HeadlessBrowserCrawlerTests()
         {
-            _handlerMock = new Mock<CrawlHandler>();
+            _handlerMock = new Mock<ICrawlHandler>();
             _playwrightMock = new Mock<IPlaywright>();
             _browserMock = new Mock<IBrowser>();
             _contextMock = new Mock<IBrowserContext>();

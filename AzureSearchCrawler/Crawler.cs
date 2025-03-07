@@ -1,3 +1,4 @@
+using Abot2;
 using Abot2.Crawler;
 using Abot2.Poco;
 using AzureSearchCrawler.Interfaces;
@@ -8,23 +9,23 @@ namespace AzureSearchCrawler
 {
     /// <summary>
     ///  A convenience wrapper for an Abot crawler with a reasonable default configuration and console logging.
-    ///  The actual action to be performed on the crawled pages is passed in as a CrawlHandler.
+    ///  The actual action to be performed on the crawled pages is passed in as a ICrawlHandler.
     /// </summary>
     public class Crawler : ICrawler
     {
         private static int PageCount = 0;
 
-        private readonly CrawlHandler _handler;
+        private readonly ICrawlHandler _handler;
         private readonly Func<CrawlConfiguration, IWebCrawler> _webCrawlerFactory;
         private readonly Interfaces.IConsole _console;
         private readonly LogLevel _logLevel;
 
-        public Crawler(CrawlHandler handler, Interfaces.IConsole console, LogLevel logLevel = LogLevel.Information)
+        public Crawler(ICrawlHandler handler, Interfaces.IConsole console, LogLevel logLevel = LogLevel.Information)
             : this(handler, config => new PoliteWebCrawler(config), console, logLevel)
         {
         }
 
-        public Crawler(CrawlHandler handler, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, Interfaces.IConsole console, LogLevel logLevel)
+        public Crawler(ICrawlHandler handler, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, Interfaces.IConsole console, LogLevel logLevel)
         {
             _handler = handler ?? throw new ArgumentNullException(nameof(handler));
             _webCrawlerFactory = crawlerFactory ?? throw new ArgumentNullException(nameof(crawlerFactory));

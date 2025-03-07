@@ -8,7 +8,7 @@ namespace AzureSearchCrawler
 {
     public class SitemapCrawler : ICrawler
     {
-        private readonly CrawlHandler _handler;
+        private readonly ICrawlHandler _handler;
         private readonly IConsole _console;
         //private readonly LogLevel _logLevel;
         private readonly HttpClient _httpClient;
@@ -24,7 +24,7 @@ namespace AzureSearchCrawler
         "/robots.txt"  // Vi kollar robots.txt först för att hitta sitemap-URL
     ];
 
-        public SitemapCrawler(CrawlHandler handler, IConsole console, LogLevel logLevel = LogLevel.Information, HttpClient? httpClient = null)
+        public SitemapCrawler(ICrawlHandler handler, IConsole console, LogLevel logLevel = LogLevel.Information, HttpClient? httpClient = null)
         {
             _handler = handler ?? throw new ArgumentNullException(nameof(handler));
             _console = console ?? throw new ArgumentNullException(nameof(console));

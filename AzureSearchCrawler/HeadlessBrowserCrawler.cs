@@ -8,19 +8,19 @@ namespace AzureSearchCrawler
 {
     public class HeadlessBrowserCrawler : ICrawler, IDisposable
     {
-        private readonly CrawlHandler _handler;
+        private readonly ICrawlHandler _handler;
         private readonly IConsole _console;
         private readonly IPlaywright _playwright;
         private readonly IBrowser _browser;
         private readonly HashSet<string> _visitedUrls;
         private readonly bool _ownsPlaywright;
 
-        public HeadlessBrowserCrawler(CrawlHandler handler, IConsole console)
+        public HeadlessBrowserCrawler(ICrawlHandler handler, IConsole console)
             : this(handler, console, Playwright.CreateAsync().GetAwaiter().GetResult(), true)
         {
         }
 
-        internal HeadlessBrowserCrawler(CrawlHandler handler, IConsole console, IPlaywright playwright, bool ownsPlaywright = false)
+        internal HeadlessBrowserCrawler(ICrawlHandler handler, IConsole console, IPlaywright playwright, bool ownsPlaywright = false)
         {
             _handler = handler ?? throw new ArgumentNullException(nameof(handler));
             _console = console ?? throw new ArgumentNullException(nameof(console));
