@@ -1,3 +1,19 @@
+/*
+ * Notera: Testerna i denna klass tar medvetet längre tid att köra (1-2 sekunder) eftersom de testar 
+ * funktionalitet som är direkt kopplad till tidsfördröjningar och schemaläggning av operationer.
+ * 
+ * Detta är förväntat beteende eftersom vi behöver verifiera att:
+ * 1. Tidsfördröjningar faktiskt respekteras
+ * 2. Operationer schemaläggs korrekt över flera trådar
+ * 3. Minimumavstånd mellan operationer upprätthålls
+ * 
+ * Möjliga optimeringar för framtiden:
+ * - Använda en "fake" klocka för testning
+ * - Injicera en kontrollerbar tidskälla
+ * - Använda virtuell tid istället för reell tid
+ * - Markera tester som "långsamma" och köra dem separat
+ */
+
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using Xunit;

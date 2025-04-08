@@ -148,7 +148,7 @@ namespace AzureSearchCrawler
             var modeOption = new Option<CrawlMode>(
                 aliases: ["--crawlMode", "-cm"],
                 getDefaultValue: () => CrawlMode.Standard,
-                description: "Crawling mode (Standard or Sitemap)");
+                description: "Crawling mode (Standard, Headless or Sitemap)");
             #endregion
 
             var rootCommand = new RootCommand("Web crawler that indexes content in Azure Search.")

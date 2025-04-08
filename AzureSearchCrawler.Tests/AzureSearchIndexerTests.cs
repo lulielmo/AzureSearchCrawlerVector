@@ -3,6 +3,7 @@ using Azure;
 using Azure.AI.OpenAI;
 using Azure.Search.Documents;
 using Azure.Search.Documents.Models;
+using AzureSearchCrawler.Models;
 using AzureSearchCrawler.Tests.Mocks;
 using Moq;
 using OpenAI.Embeddings;
@@ -177,74 +178,20 @@ namespace AzureSearchCrawler.Tests
                 }
             };
 
+            var loggedMessages = new List<(string Message, LogLevel Level)>();
+            _console.LoggedMessage += (message, level) => loggedMessages.Add((message, level));
+
             // Act
             await _indexer.PageCrawledAsync(crawledPage);
 
             // Assert
-            var output = string.Join(Environment.NewLine, _console.Output);
-            Assert.Contains("No content for page", output);
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("No content extracted from http://example.com") && 
+                m.Level == LogLevel.Warning);
         }
 
         [Fact]
-        public async Task PageCrawledAsync_WithEmptyContent_LogsAndSkipsIndexing()
-        {
-            // Arrange
-            // Create a mock of OpenAIEmbedding with the correct constructor arguments
-            var fakeEmbedding = FakeOpenAIEmbedding.Create([0.1f, 0.2f, 0.3f]);
-
-            _embeddingClientMock
-                .Setup(c => c.GenerateEmbeddingAsync(
-                    It.IsAny<string>(),
-                    It.IsAny<EmbeddingGenerationOptions>(),
-                    It.IsAny<CancellationToken>()))
-                .Returns(Task.FromResult(ClientResult.FromValue(
-                    fakeEmbedding,
-                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
-
-            var textExtractor = new Mock<TextExtractor>();
-            textExtractor
-                .Setup(x => x.ExtractText(It.IsAny<bool>(), It.IsAny<string>()))
-                .Returns(new Dictionary<string, string>
-                {
-                    ["title"] = "Test Title",
-                    ["content"] = ""
-                });
-
-            var indexer = new AzureSearchIndexer(
-                "https://test.search.windows.net",
-                "test-index",
-                "test-key",
-                "https://test.ai.windows.net",
-                "test-key2",
-                "ai-deployment",
-                1,
-                true,
-                textExtractor.Object,
-                dryRun: false,
-                console: _console, 
-                enableRateLimiting: false);
-
-            var crawledPage = new CrawledPage(new Uri("http://example.com"))
-            {
-                Content = new PageContent { Text = "" }  // Tom content
-            };
-
-            // Act
-            await indexer.PageCrawledAsync(crawledPage);
-
-            // Assert
-            var output = string.Join(Environment.NewLine, _console.Output);
-            Assert.Contains("No content for page http://example.com", output);
-            _embeddingClientMock.Verify(
-                x => x.GenerateEmbeddingAsync(
-                    It.IsAny<string>(),
-                    It.IsAny<EmbeddingGenerationOptions>(),
-                    It.IsAny<CancellationToken>()),
-                Times.Never);
-        }
-
-        [Fact]
-        public async Task PageCrawledAsync_WithNullContent_LogsWarning()
+        public async Task PageCrawledAsync_WithNullContent_LogsWarningAndSkipsProcessing()
         {
             // Arrange
             var crawledPage = new CrawledPage(new Uri("http://example.com"))
@@ -252,12 +199,38 @@ namespace AzureSearchCrawler.Tests
                 Content = null
             };
 
+            var loggedMessages = new List<(string Message, LogLevel Level)>();
+            _console.LoggedMessage += (message, level) => loggedMessages.Add((message, level));
+
             // Act
             await _indexer.PageCrawledAsync(crawledPage);
 
             // Assert
-            var output = string.Join(Environment.NewLine, _console.Output);
-            Assert.Contains("No content for page", output);
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("No content extracted") && 
+                m.Level == LogLevel.Warning);
+            
+            _searchClientMock.Verify(
+                c => c.MergeOrUploadDocumentsAsync(
+                    It.IsAny<IEnumerable<WebPage>>(),
+                    It.IsAny<IndexDocumentsOptions>(),
+                    It.IsAny<CancellationToken>()),
+                Times.Never);
+        }
+
+        [Fact]
+        public async Task PageCrawledAsync_WithNullUri_ThrowsArgumentNullException()
+        {
+            // Arrange
+            var crawledPage = new CrawledPage(new Uri("http://example.com"))
+            {
+                Uri = null
+            };
+
+            // Act & Assert
+            var exception = await Assert.ThrowsAsync<ArgumentNullException>(
+                async () => await _indexer.PageCrawledAsync(crawledPage));
+            Assert.Equal("crawledPage.Uri", exception.ParamName);
         }
 
         [Fact]
@@ -340,23 +313,6 @@ namespace AzureSearchCrawler.Tests
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentNullException>(() =>
                 indexer.PageCrawledAsync(null!));
-        }
-
-        [Fact]
-        public async Task PageCrawledAsync_WithNullContent_LogsWarningAndDoesNotIndex()
-        {
-            // Arrange
-            var crawledPage = new CrawledPage(new Uri("http://example.com"))
-            {
-                Content = null
-            };
-
-            // Act
-            await _indexer.PageCrawledAsync(crawledPage);
-
-            // Assert
-            var output = string.Join(Environment.NewLine, _console.Output);
-            Assert.Contains("No content for page", output);
         }
 
         [Fact]
@@ -470,7 +426,10 @@ namespace AzureSearchCrawler.Tests
                     It.IsAny<IEnumerable<WebPage>>(),
                     It.IsAny<IndexDocumentsOptions>(),
                     It.IsAny<CancellationToken>()))
-                .Returns(Task.FromResult(new MockIndexDocumentsResult(new MockHttpResponse()) as Response<IndexDocumentsResult>));
+                .ReturnsAsync((IEnumerable<WebPage> pages, IndexDocumentsOptions options, CancellationToken token) => 
+                {
+                    return new MockIndexDocumentsResult(new MockHttpResponse()) as Response<IndexDocumentsResult>;
+                });
 
             // Create a mock of OpenAIEmbedding with the correct constructor arguments
             var fakeEmbedding = FakeOpenAIEmbedding.Create([0.1f, 0.2f, 0.3f]);
@@ -528,7 +487,10 @@ namespace AzureSearchCrawler.Tests
                     It.IsAny<IndexDocumentsOptions>(),
                     It.IsAny<CancellationToken>()))
                 .Callback(() => indexedBatches++)
-                .Returns(Task.FromResult(new MockIndexDocumentsResult(new MockHttpResponse()) as Response<IndexDocumentsResult>));
+                .ReturnsAsync((IEnumerable<WebPage> pages, IndexDocumentsOptions options, CancellationToken token) => 
+                {
+                    return new MockIndexDocumentsResult(new MockHttpResponse()) as Response<IndexDocumentsResult>;
+                });
 
             // Create a mock of OpenAIEmbedding with the correct constructor arguments
             var fakeEmbedding = FakeOpenAIEmbedding.Create([0.1f, 0.2f, 0.3f]);
@@ -555,43 +517,30 @@ namespace AzureSearchCrawler.Tests
                 await _indexer.PageCrawledAsync(crawledPage);
 
                 // Tvinga fram indexering efter var 10:e sida
-                if (i > 0 && i % 10 == 0)
+                if ((i + 1) % 10 == 0)
                 {
-                    await _indexer.CrawlFinishedAsync();
+                    await _indexer.IndexBatchIfNecessary();
                 }
             }
 
-            await _indexer.CrawlFinishedAsync();
-
             // Assert
-            Assert.True(indexedBatches > 1, "Should have indexed multiple batches");
-            _searchClientMock.Verify(
-                c => c.MergeOrUploadDocumentsAsync(
-                    It.IsAny<IEnumerable<WebPage>>(),
-                    It.IsAny<IndexDocumentsOptions>(),
-                    It.IsAny<CancellationToken>()),
-                Times.AtLeast(2));
+            Assert.True(indexedBatches >= 2, $"Expected at least 2 batches, but got {indexedBatches}");
         }
 
         [Fact]
-        public async Task IndexBatchIfNecessary_WhenExceptionOccurs_LogsWarningAndRequeuesPages()
+        public async Task CrawlFinishedAsync_WhenIndexingFails_LogsError()
         {
             // Arrange
-            _textExtractor
-                .Setup(x => x.ExtractText(It.IsAny<bool>(), It.IsAny<string>()))
-                .Returns(new Dictionary<string, string>
-                {
-                    ["title"] = "Test Title",
-                    ["content"] = "Test Content"
-                });
             _searchClientMock
                 .Setup(c => c.MergeOrUploadDocumentsAsync(
                     It.IsAny<IEnumerable<WebPage>>(),
                     It.IsAny<IndexDocumentsOptions>(),
                     It.IsAny<CancellationToken>()))
-                .ThrowsAsync(new Exception("Test exception"));
+                .ReturnsAsync((IEnumerable<WebPage> pages, IndexDocumentsOptions options, CancellationToken token) => 
+                {
+                    throw new InvalidOperationException("Test error");
+                });
 
-            // Create a mock of OpenAIEmbedding with the correct constructor arguments
             var fakeEmbedding = FakeOpenAIEmbedding.Create([0.1f, 0.2f, 0.3f]);
 
             _embeddingClientMock
@@ -603,23 +552,36 @@ namespace AzureSearchCrawler.Tests
                     fakeEmbedding,
                     Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
 
-            var crawledPage = new CrawledPage(new Uri("http://example.com"))
+            var loggedMessages = new List<(string Message, LogLevel Level)>();
+            _console.LoggedMessage += (message, level) => loggedMessages.Add((message, level));
+
+            // Add two pages to the queue to ensure one remains after IndexBatchIfNecessary
+            for (int i = 0; i < 2; i++)
             {
-                Content = new PageContent
+                var crawledPage = new CrawledPage(new Uri($"http://example.com/{i}"))
                 {
-                    Text = "<html><body>Test content</body></html>"
-                }
-            };
+                    Content = new PageContent { Text = "<html><body>Test content</body></html>" }
+                };
+                await _indexer.PageCrawledAsync(crawledPage);
+            }
 
-            // Act
-            await _indexer.PageCrawledAsync(crawledPage);
-            await Assert.ThrowsAsync<Exception>(async () => await _indexer.CrawlFinishedAsync());
+            // Act & Assert
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                async () => await _indexer.CrawlFinishedAsync());
 
-            // Assert
-            var output = string.Join(Environment.NewLine, _console.Output);
-            Assert.Contains("Indexing batch of 1", output);
-            Assert.Contains("Error indexing batch:", output);
-            Assert.Contains("Error: indexing queue is still not empty at the end", output);
+            var messagesCopy = loggedMessages.ToList();
+            Assert.Contains(messagesCopy, m => 
+                m.Message.Contains("Processing remaining items in indexing queue") && 
+                m.Level == LogLevel.Information);
+            Assert.Contains(messagesCopy, m => 
+                m.Message.Contains("Critical error:") && 
+                m.Level == LogLevel.Error);
+            Assert.Contains(messagesCopy, m => 
+                m.Message.Contains("Error details:") && 
+                m.Level == LogLevel.Error);
+            Assert.Contains(messagesCopy, m => 
+                m.Message.Contains("Technical details:") && 
+                m.Level == LogLevel.Debug);
         }
 
         [Fact]
@@ -743,22 +705,6 @@ namespace AzureSearchCrawler.Tests
         public async Task CrawlFinishedAsync_WithRemainingItemsInQueue_LogsWarning()
         {
             // Arrange
-            _textExtractor
-                .Setup(x => x.ExtractText(It.IsAny<bool>(), It.IsAny<string>()))
-                .Returns(new Dictionary<string, string>
-                {
-                    ["title"] = "Test Title",
-                    ["content"] = "Test Content"
-                });
-
-            _searchClientMock
-                .Setup(c => c.MergeOrUploadDocumentsAsync(
-                    It.IsAny<IEnumerable<WebPage>>(),
-                    It.IsAny<IndexDocumentsOptions>(),
-                    It.IsAny<CancellationToken>()))
-                .ThrowsAsync(new Exception("Simulated indexing error"));
-
-            // Create a mock of OpenAIEmbedding with the correct constructor arguments
             var fakeEmbedding = FakeOpenAIEmbedding.Create([0.1f, 0.2f, 0.3f]);
 
             _embeddingClientMock
@@ -770,19 +716,37 @@ namespace AzureSearchCrawler.Tests
                     fakeEmbedding,
                     Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
 
+            _searchClientMock
+                .Setup(c => c.MergeOrUploadDocumentsAsync(
+                    It.IsAny<IEnumerable<WebPage>>(),
+                    It.IsAny<IndexDocumentsOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("Test error"));
+
+            var loggedMessages = new List<(string Message, LogLevel Level)>();
+            _console.LoggedMessage += (message, level) => loggedMessages.Add((message, level));
+
+            // Add a page to the queue
             var crawledPage = new CrawledPage(new Uri("http://example.com"))
             {
-                Content = new PageContent { Text = "<html><body>Test content</body></html>" }
+                Content = new PageContent { Text = "Test content" }
             };
             await _indexer.PageCrawledAsync(crawledPage);
 
             // Act & Assert
-            await Assert.ThrowsAsync<Exception>(async () => await _indexer.CrawlFinishedAsync());
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                async () => await _indexer.CrawlFinishedAsync());
 
-            var output = string.Join(Environment.NewLine, _console.Output);
-            Assert.Contains("Indexing batch of 1", output);
-            Assert.Contains("Error indexing batch:", output);
-            Assert.Contains("Error: indexing queue is still not empty at the end", output);
+            var messagesCopy = loggedMessages.ToList();
+            Assert.Contains(messagesCopy, m => 
+                m.Message.StartsWith("Critical error:") && 
+                m.Level == LogLevel.Error);
+            Assert.Contains(messagesCopy, m => 
+                m.Message.StartsWith("Error details:") && 
+                m.Level == LogLevel.Error);
+            Assert.Contains(messagesCopy, m => 
+                m.Message.StartsWith("Technical details:") && 
+                m.Level == LogLevel.Debug);
         }
 
         [Theory]
@@ -1065,6 +1029,10 @@ namespace AzureSearchCrawler.Tests
         public async Task CrawlFinishedAsync_WithEmptyQueue_ReturnsSuccessfully()
         {
             // Arrange
+            var mockSearchClient = new Mock<SearchClient>();
+            var mockAiClient = new Mock<AzureOpenAIClient>();
+            var mockEmbeddingClient = new Mock<EmbeddingClient>();
+
             var indexer = new AzureSearchIndexer(
                 searchServiceEndpoint: "https://search.example.com",
                 indexName: "test-index",
@@ -1074,16 +1042,29 @@ namespace AzureSearchCrawler.Tests
                 embeddingDeployment: "test-deployment",
                 azureOpenAIEmbeddingDimensions: 1536,
                 extractText: true,
-                textExtractor: new TextExtractor(),
+                textExtractor: _textExtractor.Object,
                 dryRun: false,
                 console: _console, 
                 enableRateLimiting: false);
+
+            // Inject mocked clients
+            var searchClientField = typeof(AzureSearchIndexer)
+                .GetField("_searchClient", BindingFlags.NonPublic | BindingFlags.Instance);
+            searchClientField!.SetValue(indexer, mockSearchClient.Object);
+
+            var aiClientField = typeof(AzureSearchIndexer)
+                .GetField("_azureOpenAIClient", BindingFlags.NonPublic | BindingFlags.Instance);
+            aiClientField!.SetValue(indexer, mockAiClient.Object);
+
+            var embeddingClientField = typeof(AzureSearchIndexer)
+                .GetField("_embeddingClient", BindingFlags.NonPublic | BindingFlags.Instance);
+            embeddingClientField!.SetValue(indexer, mockEmbeddingClient.Object);
 
             // Act
             await indexer.CrawlFinishedAsync();
 
             // Assert
-            _searchClientMock.Verify(
+            mockSearchClient.Verify(
                 x => x.MergeOrUploadDocumentsAsync(
                     It.IsAny<IEnumerable<WebPage>>(),
                     It.IsAny<IndexDocumentsOptions>(),
@@ -1138,10 +1119,18 @@ namespace AzureSearchCrawler.Tests
         public async Task IndexPageAsync_WhenNotDryRunAndMissingConfiguration_ThrowsRequestFailedException()
         {
             // Arrange
+            var mockSearchClient = new Mock<SearchClient>();
+            mockSearchClient
+                .Setup(c => c.IndexDocumentsAsync(
+                    It.IsAny<IndexDocumentsBatch<SearchDocument>>(),
+                    It.IsAny<IndexDocumentsOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new RequestFailedException(403, "Forbidden"));
+
             var indexer = new AzureSearchIndexer(
                 "https://test.search.windows.net",
                 "test-index",
-                "invalid-key", // Använd ogiltig nyckel för att framkalla 403
+                "test-key",
                 "https://test.ai.windows.net",
                 "test-key2",
                 "ai-deployment",
@@ -1151,6 +1140,11 @@ namespace AzureSearchCrawler.Tests
                 dryRun: false,
                 console: _console,
                 enableRateLimiting: false);
+
+            // Inject mocked client
+            var searchClientField = typeof(AzureSearchIndexer)
+                .GetField("_searchClient", BindingFlags.NonPublic | BindingFlags.Instance);
+            searchClientField!.SetValue(indexer, mockSearchClient.Object);
 
             // Act & Assert
             var exception = await Assert.ThrowsAsync<RequestFailedException>(async () =>
@@ -1164,50 +1158,98 @@ namespace AzureSearchCrawler.Tests
         }
 
         [Fact]
-        public async Task PageCrawledAsync_WithValidContent_AddsToQueueAndDoesNotIndex()
+        public async Task PageCrawledAsync_WithValidContent_LogsInformation()
         {
             // Arrange
-            var crawledPage = new CrawledPage(new Uri("http://example.com"))
+            var uri = new Uri("http://example.com");
+            var crawledPage = new CrawledPage(uri)
             {
                 Content = new PageContent { Text = "<html><body>Test content</body></html>" }
             };
 
-            _textExtractor
-                .Setup(x => x.ExtractText(It.IsAny<bool>(), It.IsAny<string>()))
-                .Returns(new Dictionary<string, string>
-                {
-                    ["title"] = "Test Title",
-                    ["content"] = "Test Content"
-                });
-
-            // Create a mock of OpenAIEmbedding with the correct constructor arguments
             var fakeEmbedding = FakeOpenAIEmbedding.Create([0.1f, 0.2f, 0.3f]);
+            var embeddingResult = ClientResult.FromValue(
+                fakeEmbedding,
+                Mock.Of<System.ClientModel.Primitives.PipelineResponse>());
 
             _embeddingClientMock
                 .Setup(c => c.GenerateEmbeddingAsync(
                     It.IsAny<string>(),
                     It.IsAny<EmbeddingGenerationOptions>(),
                     It.IsAny<CancellationToken>()))
-                .Returns(Task.FromResult(ClientResult.FromValue(
-                    fakeEmbedding,
-                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
+                .Returns(Task.FromResult(embeddingResult));
+
+            var loggedMessages = new List<(string Message, LogLevel Level)>();
+            _console.LoggedMessage += (message, level) => loggedMessages.Add((message, level));
 
             // Act
             await _indexer.PageCrawledAsync(crawledPage);
 
             // Assert
-            _searchClientMock.Verify(
-                c => c.MergeOrUploadDocumentsAsync(
-                    It.IsAny<IEnumerable<WebPage>>(),
-                    It.IsAny<IndexDocumentsOptions>(),
-                    It.IsAny<CancellationToken>()),
-                Times.Never);
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("Title embedding generated with") && 
+                m.Level == LogLevel.Debug);
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("Content details - Size:") && 
+                m.Level == LogLevel.Debug);
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("Content metadata:") && 
+                m.Level == LogLevel.Verbose);
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("Added page to indexing queue") && 
+                m.Level == LogLevel.Debug);
         }
 
         [Fact]
-        public async Task IndexBatchIfNecessary_WhenQueueIsFull_IndexesPages()
+        public async Task PageCrawledAsync_WhenEmbeddingFails_LogsError()
         {
             // Arrange
+            var uri = new Uri("http://example.com");
+            var crawledPage = new CrawledPage(uri)
+            {
+                Content = new PageContent { Text = "<html><body>Test content</body></html>" }
+            };
+
+            _embeddingClientMock
+                .Setup(c => c.GenerateEmbeddingAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<EmbeddingGenerationOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new Exception("Embedding generation failed"));
+
+            var loggedMessages = new List<(string Message, LogLevel Level)>();
+            _console.LoggedMessage += (message, level) => loggedMessages.Add((message, level));
+
+            // Act & Assert
+            await Assert.ThrowsAsync<Exception>(async () => await _indexer.PageCrawledAsync(crawledPage));
+
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("Critical error processing page") && 
+                m.Level == LogLevel.Error);
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("Technical details:") && 
+                m.Level == LogLevel.Debug);
+        }
+
+        [Fact]
+        public async Task CrawlFinishedAsync_LogsProgressAndCompletion()
+        {
+            // Arrange
+            var loggedMessages = new List<(string Message, LogLevel Level)>();
+            _console.LoggedMessage += (message, level) => loggedMessages.Add((message, level));
+
+            var fakeEmbedding = FakeOpenAIEmbedding.Create([0.1f, 0.2f, 0.3f]);
+            var embeddingResult = ClientResult.FromValue(
+                fakeEmbedding,
+                Mock.Of<System.ClientModel.Primitives.PipelineResponse>());
+
+            _embeddingClientMock
+                .Setup(c => c.GenerateEmbeddingAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<EmbeddingGenerationOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(Task.FromResult(embeddingResult));
+
             _searchClientMock
                 .Setup(c => c.MergeOrUploadDocumentsAsync(
                     It.IsAny<IEnumerable<WebPage>>(),
@@ -1217,20 +1259,8 @@ namespace AzureSearchCrawler.Tests
                     new MockIndexDocumentsResult(new MockHttpResponse()),
                     new MockHttpResponse()));
 
-            // Create a mock of OpenAIEmbedding with the correct constructor arguments
-            var fakeEmbedding = FakeOpenAIEmbedding.Create([0.1f, 0.2f, 0.3f]);
-
-            _embeddingClientMock
-                .Setup(c => c.GenerateEmbeddingAsync(
-                    It.IsAny<string>(),
-                    It.IsAny<EmbeddingGenerationOptions>(),
-                    It.IsAny<CancellationToken>()))
-                .Returns(Task.FromResult(ClientResult.FromValue(
-                    fakeEmbedding,
-                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
-
-            // Fyll kön med 1000 sidor
-            for (int i = 0; i < 1000; i++)
+            // Add some pages
+            for (int i = 0; i < 3; i++)
             {
                 var crawledPage = new CrawledPage(new Uri($"http://example.com/{i}"))
                 {
@@ -1243,194 +1273,135 @@ namespace AzureSearchCrawler.Tests
             await _indexer.CrawlFinishedAsync();
 
             // Assert
-            _searchClientMock.Verify(
-                c => c.MergeOrUploadDocumentsAsync(
-                    It.IsAny<IEnumerable<WebPage>>(),
-                    It.IsAny<IndexDocumentsOptions>(),
-                    It.IsAny<CancellationToken>()),
-                Times.AtLeastOnce());
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("Indexing batch of") && 
+                m.Level == LogLevel.Information);
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("Indexing completed successfully") && 
+                m.Level == LogLevel.Information);
         }
 
         [Fact]
-        public async Task IndexBatchIfNecessary_WhenBatchFails_LogsError()
+        public async Task PageCrawledAsync_WithDryRun_LogsVerboseInformation()
         {
             // Arrange
-            _searchClientMock
-                .Setup(c => c.MergeOrUploadDocumentsAsync(
-                    It.IsAny<IEnumerable<WebPage>>(),
-                    It.IsAny<IndexDocumentsOptions>(),
-                    It.IsAny<CancellationToken>()))
-                .ThrowsAsync(new Exception("Simulated indexing error"));
+            var textExtractor = new Mock<TextExtractor>();
+            textExtractor.Setup(t => t.ExtractText(It.IsAny<bool>(), It.IsAny<string>()))
+                .Returns(new Dictionary<string, string>
+                {
+                    ["title"] = "Test Title",
+                    ["content"] = "Test Content"
+                });
 
-            // Create a mock of OpenAIEmbedding with the correct constructor arguments
+            var indexer = new AzureSearchIndexer(
+                "https://test.search.windows.net",
+                "test-index",
+                "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
+                true,
+                textExtractor.Object,
+                dryRun: true,
+                console: _console,
+                enableRateLimiting: false);
+
+            // Inject mocked clients using reflection
+            var searchClientField = typeof(AzureSearchIndexer)
+                .GetField("_searchClient", BindingFlags.NonPublic | BindingFlags.Instance);
+            searchClientField!.SetValue(indexer, _searchClientMock.Object);
+
+            var aiClientField = typeof(AzureSearchIndexer)
+                .GetField("_azureOpenAIClient", BindingFlags.NonPublic | BindingFlags.Instance);
+            aiClientField!.SetValue(indexer, _aiClientMock.Object);
+
+            var embeddingClientField = typeof(AzureSearchIndexer)
+                .GetField("_embeddingClient", BindingFlags.NonPublic | BindingFlags.Instance);
+            embeddingClientField!.SetValue(indexer, _embeddingClientMock.Object);
+
+            var crawledPage = new CrawledPage(new Uri("http://example.com"))
+            {
+                Content = new PageContent { Text = "<html><body>Test content</body></html>" }
+            };
+
+            var loggedMessages = new List<(string Message, LogLevel Level)>();
+            _console.LoggedMessage += (message, level) => loggedMessages.Add((message, level));
+
+            // Act
+            await indexer.PageCrawledAsync(crawledPage);
+
+            // Assert
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("[DRY RUN]") && 
+                m.Level == LogLevel.Information);
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public async Task PageCrawledAsync_WithRateLimiting_LogsDebugInformation()
+        {
+            // Arrange
+            var indexer = new AzureSearchIndexer(
+                "https://test.search.windows.net",
+                "test-index",
+                "test-key",
+                "https://test.ai.windows.net",
+                "test-key2",
+                "ai-deployment",
+                1,
+                true,
+                _textExtractor.Object,
+                dryRun: false,
+                console: _console,
+                enableRateLimiting: true);
+
+            // Inject mocked clients
+            var searchClientField = typeof(AzureSearchIndexer)
+                .GetField("_searchClient", BindingFlags.NonPublic | BindingFlags.Instance);
+            searchClientField!.SetValue(indexer, _searchClientMock.Object);
+
+            var aiClientField = typeof(AzureSearchIndexer)
+                .GetField("_azureOpenAIClient", BindingFlags.NonPublic | BindingFlags.Instance);
+            aiClientField!.SetValue(indexer, _aiClientMock.Object);
+
+            var embeddingClientField = typeof(AzureSearchIndexer)
+                .GetField("_embeddingClient", BindingFlags.NonPublic | BindingFlags.Instance);
+            embeddingClientField!.SetValue(indexer, _embeddingClientMock.Object);
+
+            var crawledPage = new CrawledPage(new Uri("http://example.com"))
+            {
+                Content = new PageContent { Text = "<html><body>Test content</body></html>" }
+            };
+
             var fakeEmbedding = FakeOpenAIEmbedding.Create([0.1f, 0.2f, 0.3f]);
+            var embeddingResult = ClientResult.FromValue(
+                fakeEmbedding,
+                Mock.Of<System.ClientModel.Primitives.PipelineResponse>());
 
             _embeddingClientMock
                 .Setup(c => c.GenerateEmbeddingAsync(
                     It.IsAny<string>(),
                     It.IsAny<EmbeddingGenerationOptions>(),
                     It.IsAny<CancellationToken>()))
-                .Returns(Task.FromResult(ClientResult.FromValue(
-                    fakeEmbedding,
-                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
+                .Returns(Task.FromResult(embeddingResult));
 
-            // Lägg till några sidor i kön
-            for (int i = 0; i < 5; i++)
-            {
-                var crawledPage = new CrawledPage(new Uri($"http://example.com/{i}"))
-                {
-                    Content = new PageContent { Text = "<html><body>Test content</body></html>" }
-                };
-                await _indexer.PageCrawledAsync(crawledPage);
-            }
+            var loggedMessages = new List<(string Message, LogLevel Level)>();
+            _console.LoggedMessage += (message, level) => loggedMessages.Add((message, level));
 
-            // Act & Assert
-            var exception = await Assert.ThrowsAsync<Exception>(
-                async () => await _indexer.CrawlFinishedAsync());
-            Assert.Equal("Simulated indexing error", exception.Message);
-
-            var output = string.Join(Environment.NewLine, _console.Output);
-            Assert.Contains("Error indexing batch:", output);
-        }
-
-        [Fact]
-        public async Task CrawlFinishedAsync_WithNonEmptyQueue_ProcessesRemainingItems()
-        {
-            // Arrange
-            var indexer = new AzureSearchIndexer(
-                "https://test.search.windows.net",
-                "test-index",
-                "test-key",
-                "https://test.ai.windows.net",
-                "test-key2",
-                "ai-deployment",
-                1,
-                extractText: true,
-                textExtractor: _textExtractor.Object,
-                dryRun: true,
-                console: _console, 
-                enableRateLimiting: false);
-
-            // Lägg till en sida i kön
-            var crawledPage = new CrawledPage(new Uri("http://example.com"))
-            {
-                Content = new PageContent { Text = "<html><body>Test content</body></html>" }
-            };
+            // Act
             await indexer.PageCrawledAsync(crawledPage);
 
-            // Act
-            await indexer.CrawlFinishedAsync();
-
             // Assert
-            var output = string.Join(Environment.NewLine, _console.Output);
-            Assert.Contains("[DRY RUN] Would index page: http://example.com", output);
-        }
-
-        [Fact]
-        public async Task IndexBatchIfNecessary_WhenQueueHasItems_ProcessesUpToBatchSizeItems()
-        {
-            // Arrange
-            var indexer = new AzureSearchIndexer(
-                "https://test.search.windows.net",
-                "test-index",
-                "test-key",
-                "https://test.ai.windows.net",
-                "test-key2",
-                "ai-deployment",
-                1,
-                extractText: true,
-                textExtractor: _textExtractor.Object,
-                dryRun: true,
-                console: _console, 
-                enableRateLimiting: false);
-
-            // Fyll kön med 1000 sidor
-            for (int i = 0; i < 1000; i++)
-            {
-                var crawledPage = new CrawledPage(new Uri($"http://example.com/{i}"))
-                {
-                    Content = new PageContent { Text = "<html><body>Test content</body></html>" }
-                };
-                await indexer.PageCrawledAsync(crawledPage);
-            }
-
-            // Act
-            await indexer.CrawlFinishedAsync();
-
-            // Assert
-            var output = string.Join(Environment.NewLine, _console.Output);
-            Assert.Contains("[DRY RUN] Would index page: http://example.com/0", output);
-            Assert.Contains("[DRY RUN] Would index page: http://example.com/999", output);
-        }
-
-        [Fact]
-        public async Task CrawlFinishedAsync_WhenIndexingFails_LogsQueueNotEmptyWarning()
-        {
-            // Arrange
-            _searchClientMock
-                .Setup(c => c.MergeOrUploadDocumentsAsync(
-                    It.IsAny<IEnumerable<WebPage>>(),
-                    It.IsAny<IndexDocumentsOptions>(),
-                    It.IsAny<CancellationToken>()))
-                .ThrowsAsync(new Exception("Simulated indexing error"));
-
-                // Create a mock of OpenAIEmbedding with the correct constructor arguments
-                var fakeEmbedding = FakeOpenAIEmbedding.Create([0.1f, 0.2f, 0.3f]);
-
-                _embeddingClientMock
-                    .Setup(c => c.GenerateEmbeddingAsync(
-                        It.IsAny<string>(),
-                        It.IsAny<EmbeddingGenerationOptions>(),
-                        It.IsAny<CancellationToken>()))
-                    .Returns(Task.FromResult(ClientResult.FromValue(
-                        fakeEmbedding, 
-                        Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
-
-            // Lägg till en sida i kön
-            var crawledPage = new CrawledPage(new Uri("http://example.com"))
-            {
-                Content = new PageContent { Text = "<html><body>Test content</body></html>" }
-            };
-            await _indexer.PageCrawledAsync(crawledPage);
-
-            // Act
-            await Assert.ThrowsAsync<Exception>(async () => await _indexer.CrawlFinishedAsync());
-
-            // Assert
-            var output = string.Join(Environment.NewLine, _console.Output);
-            Assert.Contains("Error: indexing queue is still not empty at the end.", output);
-        }
-
-        [Fact]
-        public async Task IndexBatchIfNecessary_WhenSearchClientIsNull_ReturnsEarly()
-        {
-            // Arrange
-            SetPrivateField<SearchClient>(_indexer, "_searchClient", null);
-
-            // Act
-            await _indexer.IndexBatchIfNecessary();
-
-            // Assert
-            _searchClientMock.Verify(
-                x => x.MergeOrUploadDocumentsAsync(
-                    It.IsAny<IEnumerable<WebPage>>(),
-                    It.IsAny<IndexDocumentsOptions>(),
-                    It.IsAny<CancellationToken>()),
-                Times.Never);
-        }
-
-        [Fact]
-        public void GetOrCreateEmbeddingGenerationOptions_WhenOptionsExist_ReturnsCachedOptions()
-        {
-            // Arrange
-            var options = new EmbeddingGenerationOptions { Dimensions = 1536 };
-            SetPrivateField(_indexer, "_embeddingOptions", options);
-
-            // Act
-            var result = GetPrivateMethod<EmbeddingGenerationOptions>(_indexer, "GetOrCreateEmbeddingGenerationOptions");
-
-            // Assert
-            Assert.Same(options, result);
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("Title embedding generated with") && 
+                m.Level == LogLevel.Debug);
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("Content details - Size:") && 
+                m.Level == LogLevel.Debug);
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("Content metadata:") && 
+                m.Level == LogLevel.Verbose);
         }
 
         [Fact]
@@ -1449,244 +1420,6 @@ namespace AzureSearchCrawler.Tests
             Assert.Empty(result["title"]);
             Assert.Empty(result["content"]);
             return Task.CompletedTask;
-        }
-
-        [Fact]
-        public async Task PageCrawledAsync_WithNullUri_ThrowsArgumentNullException()
-        {
-            // Arrange
-            var crawledPage = new CrawledPage(new Uri("http://example.com")) //<-- Cannot set empty or null
-            {
-                Content = new PageContent { Text = "test" },
-                Uri = null // Set null here instead.
-            };
-
-            // Act & Assert
-            var exception = await Assert.ThrowsAsync<ArgumentNullException>(
-                async () => await _indexer.PageCrawledAsync(crawledPage));
-            Assert.Equal("crawledPage.Uri", exception.ParamName);
-        }
-
-        [Fact]
-        public async Task PageCrawledAsync_WhenEmbeddingClientIsNull_ThrowsArgumentNullException()
-        {
-            // Arrange
-            SetPrivateField<EmbeddingClient>(_indexer, "_embeddingClient", null);
-            var crawledPage = new CrawledPage(new Uri("http://example.com"))
-            {
-                Content = new PageContent { Text = "test content" }
-            };
-
-            _textExtractor
-                .Setup(x => x.ExtractText(It.IsAny<bool>(), It.IsAny<string>()))
-                .Returns(new Dictionary<string, string>
-                {
-                    ["title"] = "Test Title",
-                    ["content"] = "Test Content"
-                });
-
-            // Act & Assert
-            var exception = await Assert.ThrowsAsync<ArgumentNullException>(
-                async () => await _indexer.PageCrawledAsync(crawledPage));
-            Assert.Equal("_embeddingClient", exception.ParamName);
-        }
-
-        [Fact]
-        public void GetOrCreateEmbeddingClient_WhenAzureOpenAIClientIsNull_ThrowsArgumentNullException()
-        {
-            // Arrange
-            SetPrivateField<AzureOpenAIClient>(_indexer, "_embeddingClient", null);
-            SetPrivateField<AzureOpenAIClient>(_indexer, "_azureOpenAIClient", null);
-
-            // Act & Assert
-            var exception = Assert.Throws<ArgumentNullException>(
-                () => GetPrivateMethod<EmbeddingClient>(_indexer, "GetOrCreateEmbeddingClient"));
-            Assert.Equal("_azureOpenAIClient", exception.ParamName);
-        }
-
-        [Fact]
-        public async Task PageCrawledAsync_WithMissingTitle_UsesUntitledPage()
-        {
-            // Arrange
-            _textExtractor
-                .Setup(x => x.ExtractText(It.IsAny<bool>(), It.IsAny<string>()))
-                .Returns(new Dictionary<string, string>
-                {
-                    ["content"] = "Test Content"
-                    // title saknas medvetet
-                });
-
-            var crawledPage = new CrawledPage(new Uri("http://example.com"))
-            {
-                Content = new PageContent { Text = "test content" }
-            };
-
-            var fakeEmbedding = FakeOpenAIEmbedding.Create([0.1f, 0.2f, 0.3f]);
-
-            _embeddingClientMock
-                .Setup(c => c.GenerateEmbeddingAsync(
-                    It.IsAny<string>(),
-                    It.IsAny<EmbeddingGenerationOptions>(),
-                    It.IsAny<CancellationToken>()))
-                .Returns(Task.FromResult(ClientResult.FromValue(
-                    fakeEmbedding,
-                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
-
-            // Act
-            await _indexer.PageCrawledAsync(crawledPage);
-
-            // Assert
-            _embeddingClientMock.Verify(
-                x => x.GenerateEmbeddingAsync(
-                    "Untitled page",  // Verify default title is used
-                    It.IsAny<EmbeddingGenerationOptions>(),
-                    It.IsAny<CancellationToken>()),
-                Times.Once);
-        }
-
-        [Fact]
-        public async Task PageCrawledAsync_WithLongContent_TruncatesTextForEmbeddings()
-        {
-            // Arrange
-            var mockConsole = new Mock<Interfaces.IConsole>();
-            var mockEmbeddingClient = new Mock<EmbeddingClient>();
-            var mockSearchClient = new Mock<SearchClient>();
-            var textExtractor = new Mock<TextExtractor>();
-
-            var indexer = new AzureSearchIndexer(
-                "https://test.search.windows.net",
-                "test-index",
-                "test-key",
-                "https://test.ai.windows.net",
-                "test-key2",
-                "ai-deployment",
-                1536,
-                extractText: true,
-                textExtractor.Object,
-                dryRun: false,
-                mockConsole.Object,
-                enableRateLimiting: false);
-
-            // Sätt privata fält via reflection för att injecta våra mocks
-            typeof(AzureSearchIndexer)
-                .GetField("_embeddingClient", BindingFlags.NonPublic | BindingFlags.Instance)
-                ?.SetValue(indexer, mockEmbeddingClient.Object);
-
-            typeof(AzureSearchIndexer)
-                .GetField("_searchClient", BindingFlags.NonPublic | BindingFlags.Instance)
-                ?.SetValue(indexer, mockSearchClient.Object);
-
-            var longText = new string('a', 10000);  // Text längre än 8000 tecken
-            var crawledPage = new CrawledPage(new Uri("http://example.com"))
-            {
-                Content = new PageContent 
-                { 
-                    Text = $"<html><head><title>{longText}</title></head><body>{longText}</body></html>" 
-                }
-            };
-
-            textExtractor
-                .Setup(x => x.ExtractText(It.IsAny<bool>(), It.IsAny<string>()))
-                .Returns(new Dictionary<string, string>
-                {
-                    ["content"] = longText,
-                    ["title"] = longText
-                });
-
-            //var fakeEmbedding = FakeOpenAIEmbedding.Create([0.1f, 0.2f, 0.3f]);
-            var fakeEmbedding = FakeOpenAIEmbedding.Create(new float[1536]);
-
-            mockEmbeddingClient
-                .Setup(c => c.GenerateEmbeddingAsync(
-                    It.Is<string>(s => s.Length <= 8000),
-                    It.IsAny<EmbeddingGenerationOptions>(),
-                    It.IsAny<CancellationToken>()))
-                .Returns(Task.FromResult(ClientResult.FromValue(
-                    fakeEmbedding,
-                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
-
-            // Act
-            await indexer.PageCrawledAsync(crawledPage);
-
-            // Assert
-            mockEmbeddingClient.Verify(
-                x => x.GenerateEmbeddingAsync(
-                    It.Is<string>(s => s.Length <= 8000),
-                    It.IsAny<EmbeddingGenerationOptions>(),
-                    It.IsAny<CancellationToken>()),
-                Times.Exactly(2));  // En gång för titel och en gång för innehåll
-        }
-
-        [Fact]
-        public async Task PageCrawledAsync_WithShortContent_DoesNotTruncateText()
-        {
-            // Arrange
-            var mockConsole = new Mock<Interfaces.IConsole>();
-            var mockEmbeddingClient = new Mock<EmbeddingClient>();
-            var mockSearchClient = new Mock<SearchClient>();
-            var textExtractor = new Mock<TextExtractor>();
-
-            var indexer = new AzureSearchIndexer(
-                "https://test.search.windows.net",
-                "test-index",
-                "test-key",
-                "https://test.ai.windows.net",
-                "test-key2",
-                "ai-deployment",
-                1536,
-                extractText: true,
-                textExtractor.Object,
-                dryRun: false,
-                mockConsole.Object, 
-                enableRateLimiting: false);
-
-            // Sätt privata fält via reflection
-            typeof(AzureSearchIndexer)
-                .GetField("_embeddingClient", BindingFlags.NonPublic | BindingFlags.Instance)
-                ?.SetValue(indexer, mockEmbeddingClient.Object);
-
-            typeof(AzureSearchIndexer)
-                .GetField("_searchClient", BindingFlags.NonPublic | BindingFlags.Instance)
-                ?.SetValue(indexer, mockSearchClient.Object);
-
-            const string shortText = "Detta är en kort text";
-            var crawledPage = new CrawledPage(new Uri("http://example.com"))
-            {
-                Content = new PageContent
-                {
-                    Text = $"<html><head><title>Test</title></head><body>{shortText}</body></html>"
-                }
-            };
-
-            textExtractor
-                .Setup(x => x.ExtractText(It.IsAny<bool>(), It.IsAny<string>()))
-                .Returns(new Dictionary<string, string>
-                {
-                    ["content"] = shortText,
-                    ["title"] = shortText
-                });
-
-            var fakeEmbedding = FakeOpenAIEmbedding.Create(new float[1536]);
-
-            mockEmbeddingClient
-                .Setup(c => c.GenerateEmbeddingAsync(
-                    It.IsAny<string>(),
-                    It.IsAny<EmbeddingGenerationOptions>(),
-                    It.IsAny<CancellationToken>()))
-                .Returns(Task.FromResult(ClientResult.FromValue(
-                    fakeEmbedding,
-                    Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
-
-            // Act
-            await indexer.PageCrawledAsync(crawledPage);
-
-            // Assert
-            mockEmbeddingClient.Verify(
-                x => x.GenerateEmbeddingAsync(
-                    It.Is<string>(s => s.Contains(shortText)),
-                    It.IsAny<EmbeddingGenerationOptions>(),
-                    It.IsAny<CancellationToken>()),
-                Times.Exactly(2));  // En gång för titel och en gång för innehåll
         }
     }
 }

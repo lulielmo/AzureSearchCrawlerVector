@@ -12,29 +12,28 @@ namespace AzureSearchCrawler
     /// </summary>
     public class AbotCrawler : IWebCrawlingStrategy
     {
-        private static int PageCount = 0;
+        private int _pageCount;
 
         private readonly ICrawledPageProcessor _processor;
         private readonly Func<CrawlConfiguration, IWebCrawler> _webCrawlerFactory;
         private readonly IConsole _console;
-        private readonly LogLevel _logLevel;
 
-        public AbotCrawler(ICrawledPageProcessor processor, IConsole console, LogLevel logLevel = LogLevel.Information)
-            : this(processor, config => new PoliteWebCrawler(config), console, logLevel)
+        public AbotCrawler(ICrawledPageProcessor processor, IConsole console)
+            : this(processor, config => new PoliteWebCrawler(config), console)
         {
         }
 
-        public AbotCrawler(ICrawledPageProcessor processor, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, IConsole console, LogLevel logLevel)
+        public AbotCrawler(ICrawledPageProcessor processor, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, IConsole console)
         {
             _processor = processor ?? throw new ArgumentNullException(nameof(processor));
             _webCrawlerFactory = crawlerFactory ?? throw new ArgumentNullException(nameof(crawlerFactory));
             _console = console ?? throw new ArgumentNullException(nameof(console));
-            _logLevel = logLevel;
+            _pageCount = 0;
         }
 
         public async Task CrawlAsync(Uri rootUri, int maxPages, int maxDepth, string? domSelector = null)
         {
-            PageCount = 0;
+            _pageCount = 0;
 
             if (maxPages <= 0)
                 throw new ArgumentException("maxPages must be greater than 0", nameof(maxPages));
@@ -43,19 +42,28 @@ namespace AzureSearchCrawler
                 throw new ArgumentException("maxDepth must be greater than 0", nameof(maxDepth));
 
             var config = CreateCrawlConfiguration(maxPages, maxDepth);
-            IWebCrawler crawler = _webCrawlerFactory(config);
+            var crawler = _webCrawlerFactory(config);
 
-            crawler.PageCrawlStarting += (sender, args) => Crawler_ProcessPageCrawlStarting(sender!, args);
-            crawler.PageCrawlCompleted += (sender, args) => Crawler_ProcessPageCrawlCompleted(sender!, args);
+            crawler.PageCrawlStarting += Crawler_ProcessPageCrawlStarting;
+            crawler.PageCrawlCompleted += Crawler_ProcessPageCrawlCompleted;
+            
+            _console.WriteLine($"Starting web crawl of {rootUri.AbsoluteUri}", LogLevel.Information);
+            _console.WriteLine($"Crawl configuration: Max pages={maxPages}, Max depth={maxDepth}, Concurrent threads={config.MaxConcurrentThreads}", LogLevel.Information);
+            _console.WriteLine($"Performance settings: Timeout={config.CrawlTimeoutSeconds}s, Delay between requests={config.MinCrawlDelayPerDomainMilliSeconds}ms", LogLevel.Debug);
+            _console.WriteLine($"Request configuration: User-Agent='{config.UserAgentString}'", LogLevel.Debug);
             
             if (domSelector != null)
             {
+                _console.WriteLine($"Using DOM selector filter: {domSelector}", LogLevel.Information);
                 crawler.ShouldScheduleLinkDecisionMaker = (uri, crawledPage, crawlContext) =>
                 {
                     if (crawledPage.AngleSharpHtmlDocument == null)
+                    {
+                        _console.WriteLine($"Skipping link evaluation - No HTML document available for {uri.AbsoluteUri}", LogLevel.Debug);
                         return true;
+                    }
 
-                    LogMessage($"Checking {uri.AbsoluteUri} against selector '{domSelector}'", LogLevel.Verbose);
+                    _console.WriteLine($"Evaluating link against selector '{domSelector}': {uri.AbsoluteUri}", LogLevel.Verbose);
                     var links = crawledPage.AngleSharpHtmlDocument
                         .QuerySelectorAll($"{domSelector} a")
                         .Where(a => a.OuterHtml.Contains(uri.LocalPath));
@@ -63,7 +71,7 @@ namespace AzureSearchCrawler
                     var shouldCrawl = links.Any();
                     if (!shouldCrawl)
                     {
-                        LogMessage($"Skipping {uri.AbsoluteUri} - not found within {domSelector}", LogLevel.Debug);
+                        _console.WriteLine($"Filtered out link that does not match selector: {uri.AbsoluteUri}", LogLevel.Debug);
                     }
                     
                     return shouldCrawl;
@@ -72,55 +80,70 @@ namespace AzureSearchCrawler
 
             try
             {
-                _console.WriteLine($"Starting crawl of {rootUri.AbsoluteUri} (max {maxPages} pages, depth {maxDepth})");
+                var startTime = DateTime.Now;
                 var result = await crawler.CrawlAsync(rootUri);
+                var duration = DateTime.Now - startTime;
 
-                var status = result.ErrorOccurred ? "with error" : "without error";
-                _console.WriteLine($"Crawl of {rootUri.AbsoluteUri} ({PageCount} pages) completed {status}");
-
-                if (result.ErrorOccurred && result.ErrorException != null)
+                if (result.ErrorOccurred)
                 {
-                    _console.WriteError($"Error: {result.ErrorException.Message}");
+                    if (result.ErrorException != null)
+                    {
+                        _console.WriteLine($"Crawl failed with critical error: {result.ErrorException.Message}", LogLevel.Error);
+                        _console.WriteLine($"Stack trace: {result.ErrorException.StackTrace}", LogLevel.Debug);
+                        throw result.ErrorException;
+                    }
+                    else
+                    {
+                        _console.WriteLine("Crawl failed with an unknown error", LogLevel.Error);
+                        throw new Exception("Crawl failed with an unknown error");
+                    }
                 }
-
-                await _processor.CrawlFinishedAsync();
+                else
+                {
+                    _console.WriteLine($"Crawl completed successfully: {_pageCount} pages processed in {duration.TotalSeconds:F2} seconds", LogLevel.Information);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _console.WriteLine($"Crawl failed with critical error: {ex.Message}", LogLevel.Error);
+                _console.WriteLine($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
+                throw;
             }
             finally
             {
-                crawler.PageCrawlStarting -= Crawler_ProcessPageCrawlStarting;
-                crawler.PageCrawlCompleted -= Crawler_ProcessPageCrawlCompleted;
+                await _processor.CrawlFinishedAsync();
             }
         }
 
-        private void Crawler_ProcessPageCrawlStarting(object? sender, PageCrawlStartingArgs args)
+        private void Crawler_ProcessPageCrawlStarting(object? sender, PageCrawlStartingArgs e)
         {
-            ArgumentNullException.ThrowIfNull(args);
-            Interlocked.Increment(ref PageCount);
-
-            PageToCrawl pageToCrawl = args.PageToCrawl;
-            var parentUri = pageToCrawl.ParentUri?.AbsoluteUri ?? "root";
-            LogMessage($"{pageToCrawl.Uri.AbsoluteUri}  found on  {parentUri}, Depth: {pageToCrawl.CrawlDepth}");
+            _pageCount++;
+            _console.WriteLine($"Processing page {_pageCount}: {e.PageToCrawl.Uri.AbsoluteUri}", LogLevel.Information);
         }
 
-        private async void Crawler_ProcessPageCrawlCompleted(object? sender, PageCrawlCompletedArgs args)
+        private async void Crawler_ProcessPageCrawlCompleted(object? sender, PageCrawlCompletedArgs e)
         {
-            ArgumentNullException.ThrowIfNull(args);
-            CrawledPage crawledPage = args.CrawledPage;
-            string uri = crawledPage.Uri.AbsoluteUri;
-
-            if (crawledPage.HttpRequestException != null || crawledPage.HttpResponseMessage?.StatusCode != HttpStatusCode.OK)
+            if (e.CrawledPage.HttpRequestException != null)
             {
-                LogMessage($"Crawl of page failed {uri}: exception '{crawledPage.HttpRequestException?.Message}', response status {crawledPage.HttpResponseMessage?.StatusCode}");
+                _console.WriteLine($"Error crawling {e.CrawledPage.Uri.AbsoluteUri}: {e.CrawledPage.HttpRequestException.Message}", LogLevel.Warning);
                 return;
             }
 
-            if (string.IsNullOrEmpty(crawledPage.Content.Text))
+            if (e.CrawledPage.HttpResponseMessage.StatusCode != HttpStatusCode.OK)
             {
-                LogMessage($"Page had no content {uri}");
+                _console.WriteLine($"Received non-200 status code {e.CrawledPage.HttpResponseMessage.StatusCode} for {e.CrawledPage.Uri.AbsoluteUri}", LogLevel.Warning);
                 return;
             }
 
-            await _processor.PageCrawledAsync(crawledPage);
+            try
+            {
+                await _processor.PageCrawledAsync(e.CrawledPage);
+            }
+            catch (Exception ex)
+            {
+                _console.WriteLine($"Error processing {e.CrawledPage.Uri.AbsoluteUri}: {ex.Message}", LogLevel.Error);
+                _console.WriteLine($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
+            }
         }
 
         private static CrawlConfiguration CreateCrawlConfiguration(int maxPages, int maxDepth)
@@ -136,16 +159,9 @@ namespace AzureSearchCrawler
                 MaxPagesToCrawl = maxPages,
                 MaxCrawlDepth = maxDepth,
                 UserAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-
             };
 
             return crawlConfig;
-        }
-
-        private void LogMessage(string message, LogLevel level = LogLevel.Information)
-        {
-            if (level <= _logLevel)
-                _console.WriteLine(message, level);
         }
     }
 }

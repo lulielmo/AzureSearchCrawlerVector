@@ -7,6 +7,7 @@ using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
 using OpenAI.Embeddings;
 using System.Collections.Concurrent;
+using System.ClientModel;
 
 namespace AzureSearchCrawler
 {
@@ -34,7 +35,6 @@ namespace AzureSearchCrawler
 
         private AzureOpenAIClient? _azureOpenAIClient;
         private EmbeddingClient? _embeddingClient;
-        private EmbeddingGenerationOptions ? _embeddingOptions;
 
         private readonly BlockingCollection<WebPage> _queue = [];
         private readonly SemaphoreSlim indexingLock = new(1, 1);
@@ -90,7 +90,6 @@ namespace AzureSearchCrawler
                 _searchClient = GetOrCreateSearchClient();
                 _azureOpenAIClient = GetOrCreateAiClient();
                 _embeddingClient = GetOrCreateEmbeddingClient();
-                _embeddingOptions = GetOrCreateEmbeddingGenerationOptions();
             }
         }
 
@@ -99,9 +98,14 @@ namespace AzureSearchCrawler
             if (_searchClient != null) return _searchClient;
             if (_dryRun) return null!;
 
+            _console.WriteLine("Initializing Azure Search client", LogLevel.Information);
+            _console.WriteLine($"Connecting to {_searchServiceEndpoint}, index: {_indexName}", LogLevel.Debug);
+            
             var endpoint = new Uri(_searchServiceEndpoint);
             var credential = new AzureKeyCredential(_adminApiKey);
             _searchClient = new SearchClient(endpoint, _indexName, credential);
+            
+            _console.WriteLine("Azure Search client initialized successfully", LogLevel.Debug);
             return _searchClient;
         }
 
@@ -110,9 +114,14 @@ namespace AzureSearchCrawler
             if (_azureOpenAIClient != null) return _azureOpenAIClient;
             if (_dryRun) return null!;
 
+            _console.WriteLine("Initializing Azure OpenAI client", LogLevel.Information);
+            _console.WriteLine($"Connecting to {_embeddingAiEndpoint}", LogLevel.Debug);
+
             Uri embeddingEndpoint = new(_embeddingAiEndpoint);
             AzureKeyCredential embeddingCredential = new(_embeddingAiAdminApiKey);
             _azureOpenAIClient = new AzureOpenAIClient(embeddingEndpoint, embeddingCredential);
+            
+            _console.WriteLine("Azure OpenAI client initialized successfully", LogLevel.Debug);
             return _azureOpenAIClient;
         }
 
@@ -122,80 +131,95 @@ namespace AzureSearchCrawler
             if (_dryRun) return null!;
             ArgumentNullException.ThrowIfNull(_azureOpenAIClient);
 
+            _console.WriteLine($"Creating embedding client for deployment {_embeddingDeployment}", LogLevel.Information);
+            _console.WriteLine($"Using dimensions: {_azureOpenAIEmbeddingDimensions}", LogLevel.Debug);
+
             _embeddingClient = _azureOpenAIClient.GetEmbeddingClient(_embeddingDeployment);
-
+            
+            _console.WriteLine("Embedding client created successfully", LogLevel.Debug);
             return _embeddingClient;
-        }
-
-        private EmbeddingGenerationOptions GetOrCreateEmbeddingGenerationOptions()
-        {
-            if (_embeddingOptions != null) { return _embeddingOptions; }
-            if (_dryRun) return null!;
-
-            _embeddingOptions = new EmbeddingGenerationOptions { Dimensions = _azureOpenAIEmbeddingDimensions };
-
-            return _embeddingOptions;
         }
 
         public async Task PageCrawledAsync(CrawledPage crawledPage)
         {
+            ArgumentNullException.ThrowIfNull(crawledPage);
+            ArgumentNullException.ThrowIfNull(crawledPage.Uri);
+            if (!_dryRun) ArgumentNullException.ThrowIfNull(_embeddingClient);
+
             try
             {
-                ArgumentNullException.ThrowIfNull(crawledPage);
-                ArgumentNullException.ThrowIfNull(crawledPage.Uri);
-                if (!_dryRun) ArgumentNullException.ThrowIfNull(_embeddingClient);
-
-                var page = ExtractPageContent(crawledPage);
-                string? text = page.GetValueOrDefault("content");
-                string? title = page.GetValueOrDefault("title") ?? "Untitled page";
-
-                if (string.IsNullOrEmpty(text))
+                if (_dryRun)
                 {
-                    _console.WriteInfoLine("No content for page {0}", crawledPage.Uri.AbsoluteUri);
+                    _console.WriteLine($"[DRY RUN] Would index page: {crawledPage.Uri}", LogLevel.Information);
                     return;
                 }
 
-                if (_dryRun)
-                    _console.WriteLine($"[DRY RUN] Would index page: {crawledPage.Uri.AbsoluteUri}");
-                else
+                if (_rateLimiter != null)
                 {
-                    ArgumentNullException.ThrowIfNull(_embeddingClient); //Hängslen och livrem
-
-                    // Trunkera text till max 8000 tecken för att vara säker
-                    const int maxLength = 8000;
-                    string truncatedText = text.Length > maxLength ? text[..maxLength] : text;
-                    string truncatedTitle = title.Length > maxLength ? title[..maxLength] : title;
-
-                    // Vänta innan första embedding-anropet (för titel)
+                    _console.WriteLine("Applying rate limiting before processing page", LogLevel.Verbose);
                     await _rateLimiter.WaitAsync();
-                    OpenAIEmbedding titleEmbedding = await _embeddingClient.GenerateEmbeddingAsync(truncatedTitle, _embeddingOptions);
-
-                    // Vänta innan andra embedding-anropet (för innehåll)
-                    await _rateLimiter.WaitAsync();
-                    OpenAIEmbedding contentEmbedding = await _embeddingClient.GenerateEmbeddingAsync(truncatedText, _embeddingOptions);
-
-                    _queue.Add(new WebPage(
-                        crawledPage.Uri.AbsoluteUri,
-                        title ?? string.Empty,
-                        text, 
-                        titleEmbedding.ToFloats(), 
-                        contentEmbedding.ToFloats()));
                 }
 
-                if (_queue.Count > IndexingBatchSize)
+                var metadata = ExtractPageContent(crawledPage);
+                if (metadata == null || string.IsNullOrEmpty(metadata["content"]))
+                {
+                    _console.WriteLine($"No content extracted from {crawledPage.Uri}", LogLevel.Warning);
+                    return;
+                }
+
+                _console.WriteLine($"Processing page: {crawledPage.Uri}", LogLevel.Information);
+                _console.WriteLine($"Content details - Size: {metadata["content"].Length} bytes, Title length: {metadata["title"].Length} chars", LogLevel.Debug);
+                _console.WriteLine($"Content metadata: {string.Join(", ", metadata.Select(kv => $"{kv.Key}: {kv.Value.Length} chars"))}", LogLevel.Verbose);
+
+                // Trunkera text till max 8000 tecken för att vara säker
+                const int maxLength = 8000;
+                string truncatedText = metadata["content"].Length > maxLength ? metadata["content"][..maxLength] : metadata["content"];
+                string truncatedTitle = metadata["title"].Length > maxLength ? metadata["title"][..maxLength] : metadata["title"];
+
+                var startTime = DateTime.Now;
+
+                ArgumentNullException.ThrowIfNull(_embeddingClient); //Hängslen och livrem
+
+                // Vänta innan första embedding-anropet (för titel)
+                if (_rateLimiter != null) await _rateLimiter.WaitAsync();
+                var titleEmbedding = await _embeddingClient.GenerateEmbeddingAsync(truncatedTitle, new EmbeddingGenerationOptions { Dimensions = _azureOpenAIEmbeddingDimensions });
+                _console.WriteLine($"Title embedding generated with {titleEmbedding.Value.ToFloats().Length} dimensions", LogLevel.Debug);
+
+                // Vänta innan andra embedding-anropet (för innehåll)
+                if (_rateLimiter != null) await _rateLimiter.WaitAsync();
+                var contentEmbedding = await _embeddingClient.GenerateEmbeddingAsync(truncatedText, new EmbeddingGenerationOptions { Dimensions = _azureOpenAIEmbeddingDimensions });
+                _console.WriteLine($"Content embedding generated with {contentEmbedding.Value.ToFloats().Length} dimensions", LogLevel.Debug);
+
+                var processingTime = DateTime.Now - startTime;
+                _console.WriteLine($"Embedding generation timing: {processingTime.TotalSeconds:F2} seconds", LogLevel.Verbose);
+
+                var webPage = new WebPage(
+                    crawledPage.Uri.ToString(),
+                    metadata["title"],
+                    metadata["content"],
+                    titleEmbedding.Value.ToFloats().ToArray(),
+                    contentEmbedding.Value.ToFloats().ToArray()
+                );
+
+                _queue.Add(webPage);
+                _console.WriteLine($"Added page to indexing queue (size: {_queue.Count}/{IndexingBatchSize})", LogLevel.Debug);
+
+                if (_queue.Count >= IndexingBatchSize)
                 {
                     await IndexBatchIfNecessary();
                 }
             }
             catch (Exception ex)
             {
-                _console?.WriteLine($"Error processing page {crawledPage?.Uri}: {ex.Message}", LogLevel.Error);
                 if (ex is RequestFailedException rfe && rfe.Status == 429)
                 {
+                    _console.WriteLine($"Rate limit exceeded while processing {crawledPage?.Uri}. Waiting 5 seconds...", LogLevel.Warning);
                     await Task.Delay(TimeSpan.FromSeconds(5));
                 }
                 else
                 {
+                    _console.WriteLine($"Critical error processing page {crawledPage?.Uri}: {ex.Message}", LogLevel.Error);
+                    _console.WriteLine($"Technical details: {ex}", LogLevel.Debug);
                     throw;
                 }
             }
@@ -205,14 +229,15 @@ namespace AzureSearchCrawler
         {
             try
             {
+                _console.WriteLine("Processing remaining items in indexing queue", LogLevel.Information);
                 await IndexBatchIfNecessary();
+                _console.WriteLine($"Indexing completed successfully", LogLevel.Information);
             }
-            catch
+            catch (Exception ex)
             {
-                if (_queue.Count > 0)
-                {
-                    _console.WriteLine("Error: indexing queue is still not empty at the end.");
-                }
+                _console.WriteLine($"Critical error: {_queue.Count} items remain in indexing queue", LogLevel.Error);
+                _console.WriteLine($"Error details: {ex.Message}", LogLevel.Error);
+                _console.WriteLine($"Technical details: {ex}", LogLevel.Debug);
                 throw;
             }
         }
@@ -225,33 +250,33 @@ namespace AzureSearchCrawler
             {
                 if (_queue.Count == 0 || _searchClient == null)
                 {
-                    // Returnera ett tomt resultat
                     return await Task.FromResult<IndexDocumentsResult>(null!);
                 }
 
-                int batchSize = Math.Min(_queue.Count, IndexingBatchSize);
-                _console.WriteInfoLine("Indexing batch of {0}", batchSize);
-
-                var pages = new List<WebPage>(batchSize);
-                for (int i = 0; i < batchSize; i++)
+                var batch = new List<WebPage>();
+                while (_queue.Count > 0 && batch.Count < IndexingBatchSize)
                 {
-                    pages.Add(_queue.Take());
-                }
-
-                try
-                {
-                    return await _searchClient.MergeOrUploadDocumentsAsync(pages);
-                }
-                catch (Exception ex)
-                {
-                    _console.WriteLine($"Error indexing batch: {ex.Message}");
-                    // Lägg tillbaka sidorna i kön
-                    foreach (var page in pages)
+                    if (_queue.TryTake(out var page))
                     {
-                        _queue.Add(page);
+                        batch.Add(page);
                     }
-                    throw;
                 }
+
+                if (_dryRun)
+                {
+                    _console.WriteLine($"[DRY RUN] Would index batch of {batch.Count} pages", LogLevel.Information);
+                    return await Task.FromResult<IndexDocumentsResult>(null!);
+                }
+
+                _console.WriteLine($"Indexing batch of {batch.Count} pages", LogLevel.Information);
+                var startTime = DateTime.Now;
+                var result = await _searchClient.MergeOrUploadDocumentsAsync(batch);
+                var processingTime = DateTime.Now - startTime;
+                
+                _console.WriteLine($"Batch details - Size: {batch.Count}, Average content length: {batch.Average(p => p.Content.Length):F0} chars", LogLevel.Debug);
+                _console.WriteLine($"Batch indexing timing: {processingTime.TotalSeconds:F2} seconds", LogLevel.Verbose);
+
+                return result;
             }
             finally
             {
@@ -280,24 +305,40 @@ namespace AzureSearchCrawler
             ArgumentNullException.ThrowIfNull(url);
             ArgumentNullException.ThrowIfNull(content);
 
-            if (_dryRun)
+            try 
             {
-                _console.WriteLine($"[DRY RUN] Would index page: {url}");
-                return;
-            }
-
-            var searchClient = GetOrCreateSearchClient(); // Kommer kasta exception om den inte kan initialiseras
-
-            var batch = new IndexDocumentsBatch<SearchDocument>();
-            batch.Actions.Add(IndexDocumentsAction.Upload(
-                new SearchDocument
+                if (_dryRun)
                 {
-                    ["id"] = url,
-                    ["content"] = content["content"],
-                    ["title"] = content["title"]
-                }));
+                    _console.WriteLine($"[DRY RUN] Would index page: {url}", LogLevel.Information);
+                    return;
+                }
 
-            await searchClient.IndexDocumentsAsync(batch);
+                var searchClient = GetOrCreateSearchClient();
+                _console.WriteLine($"Indexing single page: {url}", LogLevel.Information);
+                _console.WriteLine($"Content size: {content["content"].Length} bytes, Title length: {content["title"].Length} chars", LogLevel.Debug);
+
+                var batch = new IndexDocumentsBatch<SearchDocument>();
+                batch.Actions.Add(IndexDocumentsAction.Upload(
+                    new SearchDocument
+                    {
+                        ["id"] = url,
+                        ["content"] = content["content"],
+                        ["title"] = content["title"]
+                    }));
+
+                var startTime = DateTime.Now;
+                await searchClient.IndexDocumentsAsync(batch);
+                var processingTime = DateTime.Now - startTime;
+                
+                _console.WriteLine($"Page indexed successfully", LogLevel.Information);
+                _console.WriteLine($"Indexing timing: {processingTime.TotalSeconds:F2} seconds", LogLevel.Verbose);
+            }
+            catch (Exception ex)
+            {
+                _console.WriteLine($"Failed to index page {url}: {ex.Message}", LogLevel.Error);
+                _console.WriteLine($"Technical details: {ex}", LogLevel.Debug);
+                throw;
+            }
         }
     }
 }

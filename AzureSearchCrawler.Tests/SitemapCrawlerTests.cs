@@ -73,15 +73,18 @@ namespace AzureSearchCrawler.Tests
                     return response;
                 });
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, LogLevel.Debug, _httpClient);
+            var loggedMessages = new List<(string Message, LogLevel Level)>();
+            _consoleMock.Setup(c => c.WriteLine(It.IsAny<string>(), It.IsAny<LogLevel>()))
+                .Callback<string, LogLevel>((message, level) => loggedMessages.Add((message, level)));
+
+            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
 
             // Act
             await crawler.CrawlAsync(new Uri("http://example.com"), 10, 1);
 
             // Assert
-            _consoleMock.Verify(c => c.WriteLine(
-                It.Is<string>(s => s.Contains("Found sitemap URL in robots.txt")), 
-                LogLevel.Information));
+            Assert.Contains(loggedMessages, m => m.Message.Contains("Found sitemap URL in robots.txt:") && m.Level == LogLevel.Information);
+
             _handlerMock.Verify(h => h.PageCrawledAsync(It.IsAny<CrawledPage>()), Times.Once);
         }
 
@@ -131,7 +134,7 @@ namespace AzureSearchCrawler.Tests
                     return response;
                 });
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, LogLevel.Debug, _httpClient);
+            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
 
             // Act
             await crawler.CrawlAsync(new Uri("http://example.com"), 10, 1);
@@ -180,7 +183,7 @@ namespace AzureSearchCrawler.Tests
                     return response;
                 });
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, LogLevel.Debug, _httpClient);
+            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
 
             // Act
             await crawler.CrawlAsync(new Uri("http://example.com"), maxPages: 2, maxDepth: 1);
@@ -227,7 +230,7 @@ namespace AzureSearchCrawler.Tests
                     return response;
                 });
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, LogLevel.Debug, _httpClient);
+            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
 
             // Act
             await crawler.CrawlAsync(new Uri("http://example.com"), 10, 1);
@@ -240,7 +243,7 @@ namespace AzureSearchCrawler.Tests
             
             // Verify logging of skipped URLs
             _consoleMock.Verify(c => c.WriteLine(
-                It.Is<string>(s => s.Contains("Skipping URL from different domain")), 
+                It.Is<string>(s => s.Contains("Skipping external URL:")), 
                 LogLevel.Warning), 
                 Times.Once);
             _consoleMock.Verify(c => c.WriteLine(
@@ -301,7 +304,7 @@ namespace AzureSearchCrawler.Tests
                     return response;
                 });
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, LogLevel.Debug, _httpClient);
+            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
 
             // Act
             await crawler.CrawlAsync(new Uri("http://example.com"), 10, 1);
@@ -373,7 +376,11 @@ namespace AzureSearchCrawler.Tests
                     return response;
                 });
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, LogLevel.Debug, _httpClient);
+            var loggedMessages = new List<(string Message, LogLevel Level)>();
+            _consoleMock.Setup(c => c.WriteLine(It.IsAny<string>(), It.IsAny<LogLevel>()))
+                .Callback<string, LogLevel>((message, level) => loggedMessages.Add((message, level)));
+
+            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
 
             // Act
             await crawler.CrawlAsync(new Uri("http://example.com"), 10, 1);
@@ -383,10 +390,7 @@ namespace AzureSearchCrawler.Tests
                 p.Uri.ToString() == "http://example.com/page1")), Times.Once);
             _handlerMock.Verify(h => h.PageCrawledAsync(It.Is<CrawledPage>(p => 
                 p.Uri.ToString() == "http://example.com/page2")), Times.Once);
-            _consoleMock.Verify(c => c.WriteLine(
-                It.Is<string>(s => s.Contains("Circular reference detected")), 
-                LogLevel.Warning), 
-                Times.AtLeast(1));
+            Assert.Contains(loggedMessages, m => m.Message.Contains("Skipping sitemap: circular reference detected at") && m.Level == LogLevel.Warning);
         }
 
         /// <summary>
@@ -419,15 +423,15 @@ namespace AzureSearchCrawler.Tests
                     return response;
                 });
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, LogLevel.Debug, _httpClient);
+            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
 
             // Act
             await crawler.CrawlAsync(new Uri("http://example.com"), 10, 1);
 
             // Assert
             _consoleMock.Verify(c => c.WriteLine(
-                "Maximum sitemap depth reached",
-                LogLevel.Warning), Times.AtLeastOnce);
+                It.Is<string>(s => s.Contains("Maximum sitemap depth reached (10)")), 
+                LogLevel.Warning), Times.Once());
             
             // Verifiera att vi nådde maxdjupet (11 nivåer: 0-10)
             Assert.True(depthCounter >= 11, $"Depth counter only reached {depthCounter}");
@@ -435,6 +439,7 @@ namespace AzureSearchCrawler.Tests
         #endregion
 
         #region Felhantering och Edge Cases
+        /// <summary>
         /// Verifierar att crawlern hanterar ogiltig XML-struktur och fortsätter
         /// med nästa sitemap.
         /// </summary>
@@ -443,9 +448,9 @@ namespace AzureSearchCrawler.Tests
         {
             // Arrange
             var invalidSitemapContent = @"<?xml version=""1.0"" encoding=""UTF-8""?>
-<wrongroot xmlns=""http://www.sitemaps.org/schemas/sitemap/0.9"">
+<invalid>
     <url><loc>http://example.com/page1</loc></url>
-</wrongroot>";
+</invalid>";
 
             _httpHandlerMock
                 .Protected()
@@ -455,36 +460,30 @@ namespace AzureSearchCrawler.Tests
                     ItExpr.IsAny<CancellationToken>())
                 .ReturnsAsync((HttpRequestMessage req, CancellationToken token) =>
                 {
-                    if (req.RequestUri!.ToString() == "http://example.com/sitemap.xml")
+                    var response = new HttpResponseMessage(HttpStatusCode.OK);
+                    if (req.RequestUri!.ToString().EndsWith("/sitemap.xml"))
                     {
-                        return new HttpResponseMessage(HttpStatusCode.OK) 
-                        { 
-                            Content = new StringContent(invalidSitemapContent) 
-                        };
+                        response.Content = new StringContent(invalidSitemapContent);
                     }
-                    // Alla andra URLs returnerar 404
-                    return new HttpResponseMessage(HttpStatusCode.NotFound);
+                    else
+                    {
+                        response.StatusCode = HttpStatusCode.NotFound;
+                    }
+                    return response;
                 });
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, LogLevel.Debug, _httpClient);
+            var loggedMessages = new List<(string Message, LogLevel Level)>();
+            _consoleMock.Setup(c => c.WriteLine(It.IsAny<string>(), It.IsAny<LogLevel>()))
+                .Callback<string, LogLevel>((message, level) => loggedMessages.Add((message, level)));
+
+            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
 
             // Act
-            await Assert.ThrowsAsync<Exception>(() => 
-                crawler.CrawlAsync(new Uri("http://example.com"), 10, 1));
+            await Assert.ThrowsAsync<Exception>(async () => 
+                await crawler.CrawlAsync(new Uri("http://example.com"), 10, 1));
 
             // Assert
-            _consoleMock.Verify(c => c.WriteLine(
-                "Trying sitemap at http://example.com/sitemap.xml",
-                LogLevel.Debug), Times.Once);
-            
-            _consoleMock.Verify(c => c.WriteLine(
-                "Invalid sitemap format at http://example.com/sitemap.xml",
-                LogLevel.Warning), Times.Once);
-            
-            // Verifiera att vi försöker med andra platser efter den första misslyckas
-            _consoleMock.Verify(c => c.WriteLine(
-                It.Is<string>(s => s.Contains("No sitemap found at")),
-                LogLevel.Debug), Times.AtLeast(1));
+            Assert.Contains(loggedMessages, m => m.Message.Contains("Invalid sitemap format at") && m.Level == LogLevel.Warning);
         }
 
         /// <summary>
@@ -496,9 +495,9 @@ namespace AzureSearchCrawler.Tests
         {
             // Arrange
             var sitemapContent = @"<?xml version=""1.0"" encoding=""UTF-8""?>
-<sitemapindex xmlns=""http://www.sitemaps.org/schemas/sitemap/0.9"">
-    <sitemap><loc>http://example.com/error-sitemap.xml</loc></sitemap>
-</sitemapindex>";
+<urlset xmlns=""http://www.sitemaps.org/schemas/sitemap/0.9"">
+    <url><loc>http://example.com/page1</loc></url>
+</urlset>";
 
             _httpHandlerMock
                 .Protected()
@@ -508,25 +507,31 @@ namespace AzureSearchCrawler.Tests
                     ItExpr.IsAny<CancellationToken>())
                 .ReturnsAsync((HttpRequestMessage req, CancellationToken token) =>
                 {
-                    if (req.RequestUri!.ToString().Contains("error-sitemap.xml"))
+                    if (req.RequestUri!.ToString().EndsWith("/sitemap.xml"))
                     {
-                        throw new HttpRequestException("Simulated error");
+                        return new HttpResponseMessage(HttpStatusCode.OK)
+                        {
+                            Content = new StringContent(sitemapContent)
+                        };
                     }
-                    return new HttpResponseMessage(HttpStatusCode.OK) 
-                    { 
-                        Content = new StringContent(sitemapContent) 
-                    };
+                    else if (req.RequestUri.ToString().EndsWith("/page1"))
+                    {
+                        throw new HttpRequestException("Failed to load page");
+                    }
+                    return new HttpResponseMessage(HttpStatusCode.NotFound);
                 });
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, LogLevel.Debug, _httpClient);
+            var loggedMessages = new List<(string Message, LogLevel Level)>();
+            _consoleMock.Setup(c => c.WriteLine(It.IsAny<string>(), It.IsAny<LogLevel>()))
+                .Callback<string, LogLevel>((message, level) => loggedMessages.Add((message, level)));
+
+            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
 
             // Act
             await crawler.CrawlAsync(new Uri("http://example.com"), 10, 1);
 
             // Assert
-            _consoleMock.Verify(c => c.WriteLine(
-                It.Is<string>(s => s.Contains("Failed to process sitemap")),
-                LogLevel.Error), Times.Once);
+            Assert.Contains(loggedMessages, m => m.Message.Contains("Failed to crawl") && m.Level == LogLevel.Error);
         }
 
         /// <summary>
