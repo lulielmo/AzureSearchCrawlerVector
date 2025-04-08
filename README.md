@@ -47,7 +47,8 @@ Options:
   -ds, --domSelector <domSelector>                           DOM selector to limit which links to follow (e.g.
                                                              'div.blog-container div.blog-main')
   -v, --verbose                                              Enable verbose output [default: False]
-  -cm, --crawlMode <Sitemap|Standard>                        Crawling mode (Standard or Sitemap) [default: Standard]
+  -cm, --crawlMode <Headless|Sitemap|Standard>               Crawling mode (Standard, Headless or Sitemap) [default:
+                                                             Standard]
   --version                                                  Show version information
   -?, -h, --help                                             Show help and usage information
 ```
