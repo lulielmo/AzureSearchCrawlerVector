@@ -5,6 +5,7 @@ using Azure.Search.Documents;
 using Azure.Search.Documents.Models;
 using AzureSearchCrawler.Models;
 using AzureSearchCrawler.Tests.Mocks;
+using AzureSearchCrawler.TestUtilities;
 using Moq;
 using OpenAI.Embeddings;
 using System.ClientModel;
@@ -1193,11 +1194,11 @@ namespace AzureSearchCrawler.Tests
                 m.Message.Contains("Content details - Size:") && 
                 m.Level == LogLevel.Debug);
             Assert.Contains(loggedMessages, m => 
-                m.Message.Contains("Content metadata:") && 
-                m.Level == LogLevel.Verbose);
-            Assert.Contains(loggedMessages, m => 
                 m.Message.Contains("Added page to indexing queue") && 
                 m.Level == LogLevel.Debug);
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("Processing page:") && 
+                m.Level == LogLevel.Information);
         }
 
         [Fact]
@@ -1400,8 +1401,11 @@ namespace AzureSearchCrawler.Tests
                 m.Message.Contains("Content details - Size:") && 
                 m.Level == LogLevel.Debug);
             Assert.Contains(loggedMessages, m => 
-                m.Message.Contains("Content metadata:") && 
-                m.Level == LogLevel.Verbose);
+                m.Message.Contains("Content embedding generated with") && 
+                m.Level == LogLevel.Debug);
+            Assert.Contains(loggedMessages, m =>
+                m.Message.Contains("Added page to indexing queue") &&
+                m.Level == LogLevel.Debug);
         }
 
         [Fact]

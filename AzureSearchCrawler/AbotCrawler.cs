@@ -17,18 +17,23 @@ namespace AzureSearchCrawler
         private readonly ICrawledPageProcessor _processor;
         private readonly Func<CrawlConfiguration, IWebCrawler> _webCrawlerFactory;
         private readonly IConsole _console;
+        private string? _domSelector;
 
-        public AbotCrawler(ICrawledPageProcessor processor, IConsole console)
-            : this(processor, config => new PoliteWebCrawler(config), console)
+        public AbotCrawler(ICrawledPageProcessor processor, IConsole console, string? domSelector = null)
+            : this(processor, config => new PoliteWebCrawler(config), console, domSelector)
         {
         }
 
-        public AbotCrawler(ICrawledPageProcessor processor, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, IConsole console)
+        public AbotCrawler(ICrawledPageProcessor processor, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, IConsole console, string? domSelector = null)
         {
             _processor = processor ?? throw new ArgumentNullException(nameof(processor));
             _webCrawlerFactory = crawlerFactory ?? throw new ArgumentNullException(nameof(crawlerFactory));
             _console = console ?? throw new ArgumentNullException(nameof(console));
             _pageCount = 0;
+            if (domSelector != null)
+            {
+                _domSelector = domSelector;
+            }
         }
 
         public async Task CrawlAsync(Uri rootUri, int maxPages, int maxDepth, string? domSelector = null)
@@ -41,6 +46,11 @@ namespace AzureSearchCrawler
             if (maxDepth <= 0)
                 throw new ArgumentException("maxDepth must be greater than 0", nameof(maxDepth));
 
+            if (domSelector != null)
+            {
+                _domSelector = domSelector;
+            }
+
             var config = CreateCrawlConfiguration(maxPages, maxDepth);
             var crawler = _webCrawlerFactory(config);
 
@@ -52,9 +62,9 @@ namespace AzureSearchCrawler
             _console.WriteLine($"Performance settings: Timeout={config.CrawlTimeoutSeconds}s, Delay between requests={config.MinCrawlDelayPerDomainMilliSeconds}ms", LogLevel.Debug);
             _console.WriteLine($"Request configuration: User-Agent='{config.UserAgentString}'", LogLevel.Debug);
             
-            if (domSelector != null)
+            if (_domSelector != null)
             {
-                _console.WriteLine($"Using DOM selector filter: {domSelector}", LogLevel.Information);
+                _console.WriteLine($"Using DOM selector filter: {_domSelector}", LogLevel.Information);
                 crawler.ShouldScheduleLinkDecisionMaker = (uri, crawledPage, crawlContext) =>
                 {
                     if (crawledPage.AngleSharpHtmlDocument == null)
@@ -63,9 +73,9 @@ namespace AzureSearchCrawler
                         return true;
                     }
 
-                    _console.WriteLine($"Evaluating link against selector '{domSelector}': {uri.AbsoluteUri}", LogLevel.Verbose);
+                    _console.WriteLine($"Evaluating link against selector '{_domSelector}': {uri.AbsoluteUri}", LogLevel.Verbose);
                     var links = crawledPage.AngleSharpHtmlDocument
-                        .QuerySelectorAll($"{domSelector} a")
+                        .QuerySelectorAll($"{_domSelector} a")
                         .Where(a => a.OuterHtml.Contains(uri.LocalPath));
 
                     var shouldCrawl = links.Any();

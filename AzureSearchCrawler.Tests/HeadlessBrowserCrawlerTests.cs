@@ -1,6 +1,7 @@
 using Abot2.Poco;
 using AzureSearchCrawler.Models;
 using AzureSearchCrawler.Interfaces;
+using AzureSearchCrawler.TestUtilities;
 using Microsoft.Playwright;
 using Moq;
 using Xunit;
@@ -44,7 +45,7 @@ namespace AzureSearchCrawler.Tests
                 .ReturnsAsync(_responseMock.Object);
             _responseMock.Setup(r => r.Ok).Returns(true);
             _responseMock.Setup(r => r.Status).Returns(200);
-            _responseMock.Setup(r => r.Headers).Returns(new Dictionary<string, string>());
+            _responseMock.Setup(r => r.Headers).Returns([]);
             _responseMock.Setup(r => r.StatusText).Returns("OK");
 
             _crawler = new HeadlessBrowserCrawler(_handlerMock.Object, _console, _playwrightMock.Object);
@@ -266,9 +267,9 @@ namespace AzureSearchCrawler.Tests
             mockResponse2.Setup(r => r.Ok).Returns(true);
             mockResponse3.Setup(r => r.Ok).Returns(true);
 
-            mockResponse1.Setup(r => r.Headers).Returns(new Dictionary<string, string>());
-            mockResponse2.Setup(r => r.Headers).Returns(new Dictionary<string, string>());
-            mockResponse3.Setup(r => r.Headers).Returns(new Dictionary<string, string>());
+            mockResponse1.Setup(r => r.Headers).Returns([]);
+            mockResponse2.Setup(r => r.Headers).Returns([]);
+            mockResponse3.Setup(r => r.Headers).Returns([]);
 
             mockPage1.Setup(p => p.GotoAsync(It.IsAny<string>(), It.IsAny<PageGotoOptions>()))
                 .ReturnsAsync(mockResponse1.Object);
@@ -285,11 +286,11 @@ namespace AzureSearchCrawler.Tests
                 .ReturnsAsync("<html><body><a href='http://example.com/depth3'>Link 3</a></body></html>");
 
             mockPage1.Setup(p => p.QuerySelectorAllAsync("a[href]"))
-                .ReturnsAsync(new[] { CreateMockElement("http://example.com/depth1").Object });
+                .ReturnsAsync([CreateMockElement("http://example.com/depth1").Object]);
             mockPage2.Setup(p => p.QuerySelectorAllAsync("a[href]"))
-                .ReturnsAsync(new[] { CreateMockElement("http://example.com/depth2").Object });
+                .ReturnsAsync([CreateMockElement("http://example.com/depth2").Object]);
             mockPage3.Setup(p => p.QuerySelectorAllAsync("a[href]"))
-                .ReturnsAsync(new[] { CreateMockElement("http://example.com/depth3").Object });
+                .ReturnsAsync([CreateMockElement("http://example.com/depth3").Object]);
 
             mockPage1.Setup(p => p.Context).Returns(_contextMock.Object);
             mockPage2.Setup(p => p.Context).Returns(_contextMock.Object);
@@ -302,7 +303,7 @@ namespace AzureSearchCrawler.Tests
             mockPage3.Setup(p => p.SetExtraHTTPHeadersAsync(It.IsAny<Dictionary<string, string>>()))
                 .Returns(Task.CompletedTask);
 
-            var pages = new Queue<IPage>(new[] { mockPage1.Object, mockPage2.Object, mockPage3.Object });
+            var pages = new Queue<IPage>([mockPage1.Object, mockPage2.Object, mockPage3.Object]);
 
             _browserMock.Setup(b => b.NewContextAsync(It.IsAny<BrowserNewContextOptions>()))
                 .ReturnsAsync(_contextMock.Object);
@@ -356,7 +357,7 @@ namespace AzureSearchCrawler.Tests
             _console.LoggedMessage += (message, level) => loggedMessages.Add((message, level));
 
             _pageMock.Setup(p => p.QuerySelectorAllAsync("div.content a[href]"))
-                .ReturnsAsync(Array.Empty<IElementHandle>());
+                .ReturnsAsync([]);
 
             _pageMock.Setup(p => p.ContentAsync())
                 .ReturnsAsync("<html><body><div class='content'></div></body></html>");
@@ -388,7 +389,7 @@ namespace AzureSearchCrawler.Tests
                 .ReturnsAsync("http://example.com/valid");
 
             _pageMock.Setup(p => p.QuerySelectorAllAsync("a[href]"))
-                .ReturnsAsync(new[] { link1.Object, link2.Object });
+                .ReturnsAsync([link1.Object, link2.Object]);
 
             _pageMock.Setup(p => p.ContentAsync())
                 .ReturnsAsync("<html><body><a href='invalid-url'>Invalid</a><a href='http://example.com/valid'>Valid</a></body></html>");
@@ -514,7 +515,6 @@ namespace AzureSearchCrawler.Tests
         {
             // Arrange
             var rootUrl = "http://example.com";
-            var errorPageUrl = "http://example.com/error-page";
             var expectedError = new PlaywrightException("Navigation failed");
             
             // Skapa en mock för IPage
@@ -525,7 +525,7 @@ namespace AzureSearchCrawler.Tests
             responseMock.Setup(r => r.Ok).Returns(true);
             responseMock.Setup(r => r.Status).Returns(200);
             responseMock.Setup(r => r.StatusText).Returns("OK");
-            responseMock.Setup(r => r.Headers).Returns(new Dictionary<string, string>());
+            responseMock.Setup(r => r.Headers).Returns([]);
             
             // Konfigurera rootUrl att returnera en giltig respons
             pageMock.Setup(p => p.GotoAsync(rootUrl, It.IsAny<PageGotoOptions>()))
@@ -541,7 +541,7 @@ namespace AzureSearchCrawler.Tests
                 .ReturnsAsync("/error-page");
             
             pageMock.Setup(p => p.QuerySelectorAllAsync("a[href]"))
-                .ReturnsAsync(new[] { link.Object });
+                .ReturnsAsync([link.Object]);
             
             // Skapa en mock för errorPage
             var errorPageMock = new Mock<IPage>();
@@ -616,7 +616,7 @@ namespace AzureSearchCrawler.Tests
                 m.level == LogLevel.Error);
         }
 
-        private Mock<IElementHandle> CreateMockElement(string href)
+        private static Mock<IElementHandle> CreateMockElement(string href)
         {
             var mockElement = new Mock<IElementHandle>();
             mockElement.Setup(e => e.GetAttributeAsync("href"))

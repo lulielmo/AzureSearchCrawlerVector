@@ -218,8 +218,12 @@ namespace AzureSearchCrawler
                         return;
                     }
 
-                    var consoleAdapter = new SystemConsoleAdapter(context.Console);
-                    consoleAdapter.SetVerbose(verbose);
+                    // Använd den inskickade konsolen om den implementerar IConsole, annars skapa en adapter
+                    var consoleToUse = console as Interfaces.IConsole ?? new SystemConsoleAdapter(console);
+                    if (verbose)
+                    {
+                        consoleToUse.SetVerbose(true);
+                    }
 
                     var indexer = _indexerFactory(
                             serviceEndPoint, 
@@ -232,8 +236,8 @@ namespace AzureSearchCrawler
                             extractText,
                             new TextExtractor(), 
                             dryRun, 
-                            consoleAdapter);
-                    var crawler = _crawlerFactory(indexer, mode, consoleAdapter);
+                            consoleToUse);
+                    var crawler = _crawlerFactory(indexer, mode, consoleToUse);
 
                     if (sitesFile != null)
                     {

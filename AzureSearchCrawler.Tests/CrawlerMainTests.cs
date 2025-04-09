@@ -2,6 +2,7 @@
 using Moq;
 using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
+using AzureSearchCrawler.TestUtilities;
 
 namespace AzureSearchCrawler.Tests
 {

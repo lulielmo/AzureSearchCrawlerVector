@@ -4,6 +4,7 @@ using AngleSharp;
 using AngleSharp.Html.Parser;
 using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
+using AzureSearchCrawler.TestUtilities;
 using Moq;
 using Xunit;
 using System.Reflection;
@@ -690,10 +691,7 @@ namespace AzureSearchCrawler.Tests
             // Använd reflection för att sätta AngleSharpHtmlDocument
             var property = typeof(CrawledPage).GetProperty("AngleSharpHtmlDocument");
             var field = typeof(CrawledPage).GetField("<AngleSharpHtmlDocument>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance);
-            if (field != null)
-            {
-                field.SetValue(crawledPage, document);
-            }
+            field?.SetValue(crawledPage, document);
             
             Func<Uri, CrawledPage, CrawlContext, bool>? linkDecisionMaker = null;
             

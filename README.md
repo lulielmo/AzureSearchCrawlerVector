@@ -55,6 +55,9 @@ Options:
 > [!TIP]
 > By using the option `-dr, --dryRun` you can test the crawling without sending the extracted information to the Azure AI Search Index.
 
+> [!NOTE]
+> When using the DOM selector option, the root page of the website will still be crawled even if it doesn't match the selector. This is a known behavior due to how the crawler evaluates links. The DOM selector will effectively filter all other pages based on the specified selector.
+
 ## Site json file
 By using the command line switch `-f, --sitesFile <sitesFile>` you can specify a number of sites and the desired maximum maximum crawl depth for each site. The format of the file is json as exemplified below:
 ```json
