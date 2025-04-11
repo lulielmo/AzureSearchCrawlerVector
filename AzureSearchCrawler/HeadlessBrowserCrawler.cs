@@ -209,7 +209,7 @@ namespace AzureSearchCrawler
                     {
                         _console.WriteLine($"Failed to process link: {ex.Message}", LogLevel.Warning);
                         _console.WriteLine($"Technical details: {ex}", LogLevel.Debug);
-                        // Fortsätt med nästa länk
+                        // Continue with next link
                     }
                 }
 
@@ -245,7 +245,7 @@ namespace AzureSearchCrawler
                     || href.StartsWith('/'));
         }
 
-        // Metod för testning
+        // Method for testing purposes
         public async Task ProcessLinksAsync(IPage page, string url)
         {
             var selector = "a[href]";
@@ -277,7 +277,7 @@ namespace AzureSearchCrawler
                 {
                     _console.WriteLine($"Failed to process link: {ex.Message}", LogLevel.Warning);
                     _console.WriteLine($"Technical details: {ex}", LogLevel.Debug);
-                    // Fortsätt med nästa länk
+                    // Continue with next link
                 }
             }
 

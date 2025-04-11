@@ -3,7 +3,7 @@
     public class SiteConfig
     {
         public required string Uri { get; set; }
-        public int MaxDepth { get; set; } = 10; // Default value
-        public string? DomSelector { get; set; }  // Ny property, nullable
+        public int MaxDepth { get; set; } = 10;  // Maximum depth of link traversal from root URL
+        public string? DomSelector { get; set; }  // CSS selector to filter which links to follow, e.g. "div.blog-content"
     }
 }

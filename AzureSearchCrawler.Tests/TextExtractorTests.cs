@@ -155,7 +155,7 @@ namespace AzureSearchCrawler.Tests
             var result = _extractor.ExtractText(extractText: true, htmlContent);
 
             // Assert
-            Assert.Equal("First Title", result["title"]); // Ska ta första title-taggen
+            Assert.Equal("First Title", result["title"]); // Should take the first title tag
         }
 
         [Fact]
@@ -189,14 +189,14 @@ namespace AzureSearchCrawler.Tests
         public void ExtractText_HandlesMisspelledDivTags()
         {
             // Arrange
-            // Notera den felaktiga div-taggen som är felstavad
+            // Note the misspelled div tag
             var htmlContent = "<html><body><div>Branch coverage</div><siv>93%</div><div>Line coverage</div><div>100%</div></body></html>";
 
             // Act
             var result = _extractor.ExtractText(extractText: true, htmlContent);
 
             // Assert
-            // Verifierar att det extra större-än-tecknet hanteras korrekt
+            // Verifies that the extra greater-than character is handled correctly
             Assert.Equal("Branch coverage 93% Line coverage 100%", result["content"]);
         }
 
@@ -204,7 +204,7 @@ namespace AzureSearchCrawler.Tests
         public void ExtractText_WhenNoNodesFound_ReturnsEmptyContent()
         {
             // Arrange
-            // HTML utan varken body eller title
+            // HTML without either body or title
             var htmlContent = "<html><div>Some content</div></html>";
 
             // Act

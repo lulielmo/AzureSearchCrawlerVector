@@ -171,7 +171,7 @@ namespace AzureSearchCrawler.Tests
                 .Setup(c => c.CrawlAsync(It.IsAny<Uri>()))
                 .Callback(() =>
                 {
-                    // Vänta tills event-hanteraren är registrerad
+                    // Wait until the event handler is registered
                     Task.Delay(100).ContinueWith(_ =>
                     {
                         var args = new PageCrawlCompletedArgs(new CrawlContext(), crawledPage);
@@ -1019,6 +1019,6 @@ namespace AzureSearchCrawler.Tests
             Assert.Contains(loggedMessages, m => m.message.Contains($"Max pages=1, Max depth={maxDepth}") && m.level == LogLevel.Information);
         }
 
-        private static CrawlConfiguration? _lastConfig;  // För att fånga konfigurationen
+        private static CrawlConfiguration? _lastConfig;  // To capture the configuration
     }
 }

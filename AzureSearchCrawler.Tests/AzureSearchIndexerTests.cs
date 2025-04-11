@@ -98,7 +98,7 @@ namespace AzureSearchCrawler.Tests
             Dispose(false);
         }
 
-        // Helper-metoder för reflection
+        // Helper methods for reflection
         private static void SetPrivateField<T>(object instance, string fieldName, T? value)
         {
             var field = instance.GetType().GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Instance);
@@ -141,7 +141,7 @@ namespace AzureSearchCrawler.Tests
                     fakeEmbedding, 
                     Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
 
-            // Lägg till 5 sidor
+            // Add 5 pages
             for (int i = 0; i < 5; i++)
             {
                 var crawledPage = new CrawledPage(new Uri($"http://example.com/{i}"))
@@ -252,7 +252,7 @@ namespace AzureSearchCrawler.Tests
                 console: _console,
                 enableRateLimiting: false);
 
-            // Sätt searchClient via reflection
+            // Set searchClient via reflection
             var searchClientField = typeof(AzureSearchIndexer)
                 .GetField("_searchClient", BindingFlags.NonPublic | BindingFlags.Instance);
             searchClientField!.SetValue(indexer, _searchClientMock.Object);
@@ -388,9 +388,9 @@ namespace AzureSearchCrawler.Tests
                 "test-key2",
                 "ai-deployment",
                 1,
-                true,  // Detta gör att _searchClient inte initialiseras
+                true,  // This prevents _searchClient from being initialized
                 _textExtractor.Object,
-                dryRun: true,  // Aktivera dry-run
+                dryRun: true,  // Enable dry-run
                 console: testConsole,
                 enableRateLimiting: false);
 
@@ -506,7 +506,7 @@ namespace AzureSearchCrawler.Tests
                     Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
 
             // Act
-            for (int i = 0; i < 25; i++) // Ökat från 15 till 25 för att säkerställa flera batches
+            for (int i = 0; i < 25; i++)
             {
                 var crawledPage = new CrawledPage(new Uri($"http://example.com/{i}"))
                 {
@@ -517,7 +517,7 @@ namespace AzureSearchCrawler.Tests
                 };
                 await _indexer.PageCrawledAsync(crawledPage);
 
-                // Tvinga fram indexering efter var 10:e sida
+                // Force indexing after every 10th page
                 if ((i + 1) % 10 == 0)
                 {
                     await _indexer.IndexBatchIfNecessary();
@@ -644,7 +644,7 @@ namespace AzureSearchCrawler.Tests
             var content = new Dictionary<string, string>
             {
                 ["title"] = "Test Title"
-                // "content" saknas medvetet
+                // "content" is intentionally missing
             };
 
             // Act
@@ -680,7 +680,7 @@ namespace AzureSearchCrawler.Tests
                     fakeEmbedding,
                     Mock.Of<System.ClientModel.Primitives.PipelineResponse>())));
 
-            // Lägg till sidor tills vi överstiger batchstorleken
+            // Add pages until we exceed the batch size
             for (int i = 0; i < 15; i++)
             {
                 var crawledPage = new CrawledPage(new Uri($"http://example.com/{i}"))
@@ -818,12 +818,12 @@ namespace AzureSearchCrawler.Tests
                 1,
                 extractText: true,
                 textExtractor: _textExtractor.Object,
-                dryRun: true,  // Aktivera dry-run
+                dryRun: true,  // Set dryRun to true
                 console: new TestConsole(),
                 enableRateLimiting: false);
 
             // Assert
-            // Använd reflection för att kontrollera _searchClient
+            // Use reflection to check _searchClient
             var searchClientField = typeof(AzureSearchIndexer)
                 .GetField("_searchClient", BindingFlags.NonPublic | BindingFlags.Instance);
             var searchClient = searchClientField!.GetValue(indexer);
@@ -924,7 +924,7 @@ namespace AzureSearchCrawler.Tests
                 enableRateLimiting: false);
 
             // Act
-            // Anropa GetOrCreateSearchClient via reflection eftersom den är private
+            // Call GetOrCreateSearchClient via reflection since it's private
             var method = typeof(AzureSearchIndexer)
                 .GetMethod("GetOrCreateSearchClient", BindingFlags.NonPublic | BindingFlags.Instance);
             var result = method!.Invoke(indexer, null);
@@ -938,7 +938,7 @@ namespace AzureSearchCrawler.Tests
         {
             // Act & Assert
             var exception = Assert.Throws<ArgumentException>(() => new AzureSearchIndexer(
-                searchServiceEndpoint: "",  // Tom sträng istället för null
+                searchServiceEndpoint: "",  // Empty string instead of null
                 indexName: "test-index",
                 adminApiKey: "test-key",
                 "https://test.ai.windows.net",
@@ -962,7 +962,7 @@ namespace AzureSearchCrawler.Tests
                 searchServiceEndpoint: "https://search.example.com",
                 indexName: "test-index",
                 adminApiKey: "test-key",
-                embeddingAiEndpoint: null!, // Sätt endpoint till null
+                embeddingAiEndpoint: null!, // Set endpoint to null
                 embeddingAiAdminApiKey: "test-key",
                 embeddingDeployment: "test-deployment",
                 azureOpenAIEmbeddingDimensions: 1536,
@@ -985,7 +985,7 @@ namespace AzureSearchCrawler.Tests
                 indexName: "test-index",
                 adminApiKey: "test-key",
                 embeddingAiEndpoint: "https://ai.example.com",
-                embeddingAiAdminApiKey: null!, // Sätt admin api key till null
+                embeddingAiAdminApiKey: null!, // Set admin api key to null
                 embeddingDeployment: "test-deployment",
                 azureOpenAIEmbeddingDimensions: 1536,
                 extractText: true,
@@ -1012,11 +1012,11 @@ namespace AzureSearchCrawler.Tests
                 1,
                 extractText: true,
                 textExtractor: _textExtractor.Object,
-                dryRun: true,  // Sätt dryRun till true
+                dryRun: true,  // Set dryRun to true
                 console: _console, 
                 enableRateLimiting: false);
 
-            // Sätt privata fält via reflection
+            // Set private fields via reflection
             SetPrivateField(indexer, "_azureOpenAIClient", _aiClientMock.Object);
 
             // Act

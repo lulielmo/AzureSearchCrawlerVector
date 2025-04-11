@@ -1,17 +1,17 @@
 /*
- * Notera: Testerna i denna klass tar medvetet längre tid att köra (1-2 sekunder) eftersom de testar 
- * funktionalitet som är direkt kopplad till tidsfördröjningar och schemaläggning av operationer.
+ * Note: The tests in this class intentionally take longer to run (1-2 seconds) because they test
+ * functionality that is directly related to time delays and operation scheduling.
  * 
- * Detta är förväntat beteende eftersom vi behöver verifiera att:
- * 1. Tidsfördröjningar faktiskt respekteras
- * 2. Operationer schemaläggs korrekt över flera trådar
- * 3. Minimumavstånd mellan operationer upprätthålls
+ * This is expected behavior because we need to verify that:
+ * 1. Time delays are actually respected
+ * 2. Operations are scheduled correctly across multiple threads
+ * 3. Minimum spacing between operations is maintained
  * 
- * Möjliga optimeringar för framtiden:
- * - Använda en "fake" klocka för testning
- * - Injicera en kontrollerbar tidskälla
- * - Använda virtuell tid istället för reell tid
- * - Markera tester som "långsamma" och köra dem separat
+ * Possible future optimizations:
+ * - Use a "fake" clock for testing
+ * - Inject a controllable time source
+ * - Use virtual time instead of real time
+ * - Mark tests as "slow" and run them separately
  */
 
 using System.Collections.Concurrent;
@@ -35,7 +35,7 @@ namespace AzureSearchCrawler.Tests
             stopwatch.Stop();
 
             // Assert
-            Assert.True(stopwatch.ElapsedMilliseconds < 100); // Bör returnera nästan omedelbart
+            Assert.True(stopwatch.ElapsedMilliseconds < 100); // Should return almost immediately
         }
 
         [Fact]
@@ -51,7 +51,7 @@ namespace AzureSearchCrawler.Tests
             stopwatch.Stop();
 
             // Assert
-            Assert.True(stopwatch.ElapsedMilliseconds < 100); // Första anropet bör vara snabbt
+            Assert.True(stopwatch.ElapsedMilliseconds < 100); // First call should be fast
         }
 
         [Fact]
@@ -62,15 +62,15 @@ namespace AzureSearchCrawler.Tests
             var limiter = new RateLimiter(waitTime);
             
             // Act
-            await limiter.WaitAsync(); // Första anropet
+            await limiter.WaitAsync(); // First call
             var stopwatch = new Stopwatch();
             stopwatch.Start();
-            await limiter.WaitAsync(); // Andra anropet
+            await limiter.WaitAsync(); // Second call
             stopwatch.Stop();
 
             // Assert
-            Assert.True(stopwatch.ElapsedMilliseconds >= 900); // Minst 90% av väntetiden
-            Assert.True(stopwatch.ElapsedMilliseconds <= 1200); // Max 20% över väntetiden
+            Assert.True(stopwatch.ElapsedMilliseconds >= 900); // At least 90% of wait time
+            Assert.True(stopwatch.ElapsedMilliseconds <= 1200); // Max 20% over wait time
         }
 
         [Fact]
@@ -98,7 +98,7 @@ namespace AzureSearchCrawler.Tests
             for (int i = 1; i < orderedTimestamps.Count; i++)
             {
                 var diff = orderedTimestamps[i] - orderedTimestamps[i - 1];
-                Assert.True(diff >= waitTime * 0.9); // Tillåt 10% marginal
+                Assert.True(diff >= waitTime * 0.9); // Allow 10% margin
             }
         }
 
@@ -108,7 +108,7 @@ namespace AzureSearchCrawler.Tests
             // Arrange
             var limiter = new RateLimiter(TimeSpan.FromSeconds(1));
             await limiter.WaitAsync();
-            await Task.Delay(1500); // Vänta längre än timespan
+            await Task.Delay(1500); // Wait longer than timespan
 
             // Act
             var stopwatch = new Stopwatch();
@@ -117,7 +117,7 @@ namespace AzureSearchCrawler.Tests
             stopwatch.Stop();
 
             // Assert
-            Assert.True(stopwatch.ElapsedMilliseconds < 100); // Bör returnera nästan omedelbart
+            Assert.True(stopwatch.ElapsedMilliseconds < 100); // Should return almost immediately
         }
     }
 } 

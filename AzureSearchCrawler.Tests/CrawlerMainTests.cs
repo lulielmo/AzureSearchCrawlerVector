@@ -32,13 +32,13 @@ namespace AzureSearchCrawler.Tests
             Console.SetOut(_consoleOutput);
             Console.SetError(_consoleError);
 
-            // Uppdatera konstruktorn utan domSelector
+            // Update constructor without domSelector
             _crawlerMain = new CrawlerMain(
                 (endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console) =>
                     new AzureSearchIndexer(endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console),
                 (indexer, mode, console) => _crawlerMock.Object);
 
-            // Uppdatera mock setup med domSelector parameter
+            // Update mock setup with domSelector parameter
             _crawlerMock
                 .Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>()))
                 .Returns(Task.CompletedTask);
@@ -170,7 +170,7 @@ namespace AzureSearchCrawler.Tests
             var testConsole = new TestConsole();
             var args = new[]
             {
-                "--rootUri", "ht tp://invalid.com", // Mellanslag gör URIn ogiltig men kraschar inte
+                "--rootUri", "ht tp://invalid.com", // Space makes the URI invalid but doesn't crash
                 "--serviceEndPoint", "https://test.search.windows.net",
                 "--indexName", "test-index",
                 "--adminApiKey", "test-key",

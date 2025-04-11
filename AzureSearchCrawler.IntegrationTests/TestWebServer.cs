@@ -21,7 +21,7 @@ namespace AzureSearchCrawler.IntegrationTests
             _websiteName = websiteName;
             _port = port;
 
-            // Hitta sökvägen till IntegrationTests-mappen baserat på assembly-platsen
+            // Find the path to the IntegrationTests folder based on the assembly location
             var assemblyLocation = Assembly.GetExecutingAssembly().Location;
             var assemblyDirectory = Path.GetDirectoryName(assemblyLocation)!;
             var projectRoot = Path.GetFullPath(Path.Combine(assemblyDirectory, "..\\..\\..\\.."));
@@ -121,7 +121,7 @@ namespace AzureSearchCrawler.IntegrationTests
                 }
             }
 
-            // Försök hitta och avsluta eventuella kvarvarande processer
+            // Try to find and terminate any remaining processes
             try
             {
                 var processes = Process.GetProcessesByName("TestWebsite");

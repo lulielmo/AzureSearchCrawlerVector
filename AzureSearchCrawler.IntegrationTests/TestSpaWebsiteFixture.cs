@@ -19,7 +19,7 @@ namespace AzureSearchCrawler.IntegrationTests
         {
             _port = 3000;
 
-            // Hitta sökvägen till IntegrationTests-mappen baserat på assembly-platsen
+            // Find the path to the IntegrationTests folder based on the assembly location
             var assemblyLocation = Assembly.GetExecutingAssembly().Location;
             var assemblyDirectory = Path.GetDirectoryName(assemblyLocation)!;
             var projectRoot = Path.GetFullPath(Path.Combine(assemblyDirectory, "..\\..\\..\\.."));
@@ -93,7 +93,7 @@ namespace AzureSearchCrawler.IntegrationTests
                 {
                     if (!_webServerProcess.HasExited)
                     {
-                        // Använd taskkill för att avsluta hela process-trädet
+                        // Use taskkill to terminate the entire process tree
                         var killProcess = new Process
                         {
                             StartInfo = new ProcessStartInfo

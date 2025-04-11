@@ -9,7 +9,7 @@ using Xunit;
 namespace AzureSearchCrawler.Tests
 {
     /// <summary>
-    /// Tester för SitemapCrawler-klassen.
+    /// Tests for the SitemapCrawler class.
     /// </summary>
     public class SitemapCrawlerTests
     {
@@ -26,9 +26,9 @@ namespace AzureSearchCrawler.Tests
             _httpClient = new HttpClient(_httpHandlerMock.Object);
         }
 
-        #region Grundläggande Sitemap-hantering
+        #region Basic Sitemap Handling
         /// <summary>
-        /// Verifierar att crawlern kan hitta och följa en sitemap-URL i robots.txt.
+        /// Verifies that the crawler can find and follow a sitemap URL in robots.txt.
         /// </summary>
         [Fact]
         public async Task CrawlAsync_WithRobotsFile_FindsSitemapUrl()
@@ -89,7 +89,7 @@ namespace AzureSearchCrawler.Tests
         }
 
         /// <summary>
-        /// Verifierar att crawlern kan processa alla URLs i en enkel sitemap.
+        /// Verifies that the crawler can process all URLs in a simple sitemap.
         /// </summary>
         [Fact]
         public async Task CrawlAsync_WithValidSitemap_ProcessesAllUrls()
@@ -148,9 +148,9 @@ namespace AzureSearchCrawler.Tests
         }
         #endregion
 
-        #region Begränsningar och Validering
+        #region Limitations and Validation
         /// <summary>
-        /// Verifierar att maxPages-gränsen respekteras.
+        /// Verifies that the maxPages limit is respected.
         /// </summary>
         [Fact]
         public async Task CrawlAsync_WithMaxPages_LimitsProcessedUrls()
@@ -193,10 +193,10 @@ namespace AzureSearchCrawler.Tests
         }
 
         /// <summary>
-        /// Verifierar att ogiltiga URLs hanteras korrekt:
-        /// - Tomma URLs
-        /// - URLs från andra domäner
-        /// - Felformaterade URLs
+        /// Verifies that invalid URLs are handled correctly:
+        /// - Empty URLs
+        /// - URLs from other domains
+        /// - Malformed URLs
         /// </summary>
         [Fact]
         public async Task CrawlAsync_WithInvalidUrls_SkipsInvalidEntries()
@@ -253,10 +253,10 @@ namespace AzureSearchCrawler.Tests
         }
         #endregion
 
-        #region Nästlade Sitemaps och Felhantering
+        #region Nested Sitemaps and Error Handling
         /// <summary>
-        /// Verifierar att djupt nästlade sitemaps hanteras korrekt och att
-        /// maxdjupsbegränsningen respekteras.
+        /// Verifies that deeply nested sitemaps are handled correctly and that
+        /// maxdepth restriction is respected.
         /// </summary>
         [Fact]
         public async Task CrawlAsync_WithDeepNestedSitemaps_HandlesRecursively()
@@ -315,8 +315,8 @@ namespace AzureSearchCrawler.Tests
         }
 
         /// <summary>
-        /// Verifierar att crawlern kan hantera cirkulära referenser mellan sitemaps
-        /// utan att fastna i en oändlig loop.
+        /// Verifies that the crawler can handle circular references between sitemaps
+        /// without getting stuck in an infinite loop.
         /// </summary>
         [Fact]
         public async Task CrawlAsync_WithCircularSitemapReferences_AvoidsCycles()
@@ -394,8 +394,8 @@ namespace AzureSearchCrawler.Tests
         }
 
         /// <summary>
-        /// Verifierar att crawlern stoppar vid maxdjup för att förhindra
-        /// oändlig rekursion.
+        /// Verifies that the crawler stops at maxdepth to prevent
+        /// infinite recursion.
         /// </summary>
         [Fact]
         public async Task CrawlAsync_WithDeepSitemapNesting_StopsAtMaxDepth()
@@ -438,10 +438,10 @@ namespace AzureSearchCrawler.Tests
         }
         #endregion
 
-        #region Felhantering och Edge Cases
+        #region Error Handling and Edge Cases
         /// <summary>
-        /// Verifierar att crawlern hanterar ogiltig XML-struktur och fortsätter
-        /// med nästa sitemap.
+        /// Verifies that the crawler handles invalid XML structure and continues
+        /// with the next sitemap.
         /// </summary>
         [Fact]
         public async Task CrawlAsync_WithInvalidSitemapFormat_LogsWarning()
@@ -487,8 +487,8 @@ namespace AzureSearchCrawler.Tests
         }
 
         /// <summary>
-        /// Verifierar att crawlern hanterar och loggar fel som uppstår under
-        /// sitemap-processering.
+        /// Verifies that the crawler handles and logs errors that occur during
+        /// sitemap processing.
         /// </summary>
         [Fact]
         public async Task CrawlAsync_WithSitemapProcessingError_LogsError()
@@ -535,7 +535,7 @@ namespace AzureSearchCrawler.Tests
         }
 
         /// <summary>
-        /// Verifierar att crawlern sätter rätt User-Agent när en ny HttpClient skapas.
+        /// Verifies that the crawler sets the correct User-Agent when a new HttpClient is created.
         /// </summary>
         [Fact]
         public void Constructor_WithNullHttpClient_SetsUserAgent()

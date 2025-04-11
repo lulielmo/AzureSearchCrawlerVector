@@ -2,8 +2,8 @@ namespace AzureSearchCrawler.Models
 {
     public enum CrawlMode
     {
-        Standard,   // Använder Abot för att crawla sidan
-        Sitemap,    // Använder sitemap.xml
-        Headless     // Lägg till det nya läget
+        Standard,   // Traditional web crawling with link following, best for static sites
+        Sitemap,    // Follows sitemap.xml, ideal for complete site coverage
+        Headless    // Browser-based crawling for JavaScript-rendered content and SPAs
     }
 } 

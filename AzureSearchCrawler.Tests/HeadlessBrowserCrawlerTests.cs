@@ -29,7 +29,7 @@ namespace AzureSearchCrawler.Tests
             _responseMock = new Mock<IResponse>();
             _console = new TestConsole();
 
-            // Sätt upp grundläggande mock-beteende
+            // Set up basic mock behavior
             var browserTypeMock = new Mock<IBrowserType>();
             browserTypeMock.Setup(b => b.LaunchAsync(It.IsAny<BrowserTypeLaunchOptions>()))
                 .ReturnsAsync(_browserMock.Object);
@@ -125,7 +125,7 @@ namespace AzureSearchCrawler.Tests
             var rootUrl = "http://example.com";
             var insideLink = new Mock<IElementHandle>();
 
-            // Setup för första sidan
+            // Setup for the first page
             var rootPage = new Mock<IPage>();
             rootPage.Setup(p => p.Context).Returns(_contextMock.Object);
             rootPage.Setup(p => p.GotoAsync(It.IsAny<string>(), It.IsAny<PageGotoOptions>()))
@@ -140,7 +140,7 @@ namespace AzureSearchCrawler.Tests
             insideLink.Setup(e => e.GetAttributeAsync("href"))
                 .ReturnsAsync("/inside");
 
-            // Setup för den andra sidan
+            // Setup for the second page
             var insidePage = new Mock<IPage>();
             insidePage.Setup(p => p.Context).Returns(_contextMock.Object);
             insidePage.Setup(p => p.GotoAsync(It.IsAny<string>(), It.IsAny<PageGotoOptions>()))
@@ -161,9 +161,14 @@ namespace AzureSearchCrawler.Tests
                 .ReturnsAsync(() => pageQueue.Dequeue())
                 .Callback(() => _console.WriteLine($"Creating page {++pageIndex}", LogLevel.Debug));
 
-            // Setup för context disposal
+            // Setup for context disposal
             _contextMock.Setup(c => c.DisposeAsync())
                 .Returns(ValueTask.CompletedTask);
+
+            var visitedUrls = new List<string>();
+            _handlerMock
+                .Setup(h => h.PageCrawledAsync(It.IsAny<CrawledPage>()))
+                .Callback<CrawledPage>(page => visitedUrls.Add(page.Uri.ToString()));
 
             // Act
             await _crawler.CrawlAsync(new Uri(rootUrl), maxPages: 10, maxDepth: 2);

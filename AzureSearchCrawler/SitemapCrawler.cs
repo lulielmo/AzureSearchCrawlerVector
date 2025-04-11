@@ -20,7 +20,7 @@ namespace AzureSearchCrawler
             "/sitemap_index.xml",
             "/sitemaps/sitemap.xml",
             "/sitemap/sitemap.xml",
-            "/robots.txt"  // Vi kollar robots.txt först för att hitta sitemap-URL
+            "/robots.txt"  // Check robots.txt first to find sitemap URL
         ];
 
         public SitemapCrawler(ICrawledPageProcessor processor, IConsole console, HttpClient? httpClient = null)
@@ -44,7 +44,7 @@ namespace AzureSearchCrawler
                 return absoluteUri;
             }
 
-            // Hantera relativa URLs som börjar med / eller ./ eller ../
+            // Handle relative URLs starting with / or ./ or ../
             url = url.TrimStart('.');
             if (!url.StartsWith('/'))
             {

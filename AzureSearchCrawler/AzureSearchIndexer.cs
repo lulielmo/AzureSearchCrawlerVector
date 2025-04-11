@@ -171,21 +171,21 @@ namespace AzureSearchCrawler
                 _console.WriteLine($"Content details - Size: {metadata["content"].Length} bytes, Title length: {metadata["title"].Length} chars", LogLevel.Debug);
                 _console.WriteLine($"Content metadata: {string.Join(", ", metadata.Select(kv => $"{kv.Key}: {kv.Value.Length} chars"))}", LogLevel.Verbose);
 
-                // Trunkera text till max 8000 tecken för att vara säker
+                // Truncate text to max 8000 characters to be safe
                 const int maxLength = 8000;
                 string truncatedText = metadata["content"].Length > maxLength ? metadata["content"][..maxLength] : metadata["content"];
                 string truncatedTitle = metadata["title"].Length > maxLength ? metadata["title"][..maxLength] : metadata["title"];
 
                 var startTime = DateTime.Now;
 
-                ArgumentNullException.ThrowIfNull(_embeddingClient); //Hängslen och livrem
+                ArgumentNullException.ThrowIfNull(_embeddingClient); // Double-check to ensure client is available
 
-                // Vänta innan första embedding-anropet (för titel)
+                // Wait before first embedding call (for title)
                 if (_rateLimiter != null) await _rateLimiter.WaitAsync();
                 var titleEmbedding = await _embeddingClient.GenerateEmbeddingAsync(truncatedTitle, new EmbeddingGenerationOptions { Dimensions = _azureOpenAIEmbeddingDimensions });
                 _console.WriteLine($"Title embedding generated with {titleEmbedding.Value.ToFloats().Length} dimensions", LogLevel.Debug);
 
-                // Vänta innan andra embedding-anropet (för innehåll)
+                // Wait before second embedding call (for content)
                 if (_rateLimiter != null) await _rateLimiter.WaitAsync();
                 var contentEmbedding = await _embeddingClient.GenerateEmbeddingAsync(truncatedText, new EmbeddingGenerationOptions { Dimensions = _azureOpenAIEmbeddingDimensions });
                 _console.WriteLine($"Content embedding generated with {contentEmbedding.Value.ToFloats().Length} dimensions", LogLevel.Debug);

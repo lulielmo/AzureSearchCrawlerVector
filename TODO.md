@@ -7,7 +7,16 @@
       - Identify untested code paths
 
 ## Technical Debt
-- [ ] 
+- [ ] Split AzureSearchIndexerTests.cs (1429 lines) into smaller, more focused test files:
+      - AzureSearchIndexerConstructorTests.cs - Constructor and initialization tests
+      - AzureSearchIndexerCrawlTests.cs - Page crawling and processing tests
+      - AzureSearchIndexerEmbeddingTests.cs - Embedding generation and handling tests
+      - AzureSearchIndexerDryRunTests.cs - Dry-run mode specific tests
+      Improves:
+      - Code organization and maintainability
+      - Test discovery and execution
+      - File readability
+      - Easier parallel development
 
 ## Future Enhancements
 - [ ] 

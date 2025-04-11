@@ -1,7 +1,7 @@
 using HtmlAgilityPack;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
-using System.Web;  // För HtmlDecode
+using System.Web;  // For HtmlDecode
 
 namespace AzureSearchCrawler
 {
@@ -20,21 +20,21 @@ namespace AzureSearchCrawler
         {
             var result = new Dictionary<string, string>
             {
-                ["title"] = string.Empty,  // Initiera med tom sträng
-                ["content"] = string.Empty // Initiera med tom sträng
+                ["title"] = string.Empty,  // Initialize with empty string
+                ["content"] = string.Empty // Initialize with empty string
             };
 
             HtmlDocument doc = new();
             doc.LoadHtml(content);
 
-            // Extrahera title
+            // Extract title
             var titleNode = doc.DocumentNode.SelectSingleNode("//title");
             if (titleNode != null)
             {
                 result["title"] = HttpUtility.HtmlDecode(titleNode.InnerText.Trim());
             }
 
-            // Content beror på extractText-flaggan
+            // Content depends on extractText flag
             var bodyNode = doc.DocumentNode.SelectSingleNode("//body");
             if (bodyNode != null)
             {
