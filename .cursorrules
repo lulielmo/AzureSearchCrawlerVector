@@ -1,0 +1,187 @@
+{
+    "version": "1.0",
+    "rules": {
+        "commit": {
+            "message": {
+                "format": "^(feat|fix|refactor|docs|style|test|chore|perf|ci|build)(\\([a-z-]+\\))?: .+$",
+                "description": "Commit messages must follow Conventional Commits format with optional scope",
+                "examples": [
+                    "feat(crawler): Add support for custom user agents",
+                    "fix(search): Handle null results in search response",
+                    "refactor(logging): Implement structured logging standard"
+                ],
+                "errorMessage": "Commit message must follow format: type(scope): description\nValid types: feat, fix, refactor, docs, style, test, chore, perf, ci, build"
+            },
+            "language": {
+                "enforce": "en",
+                "description": "All commit messages must be in English"
+            }
+        },
+        "language": {
+            "documentation": {
+                "enforce": "en",
+                "description": "All documentation must be in English",
+                "includes": [
+                    "XML documentation comments",
+                    "README files",
+                    "Development guidelines",
+                    "API documentation",
+                    "Code comments"
+                ]
+            },
+            "communication": {
+                "allow": "sv",
+                "description": "Team communication can be in Swedish",
+                "includes": [
+                    "Pull request discussions",
+                    "Code review comments",
+                    "Team meetings",
+                    "Internal documentation"
+                ]
+            },
+            "code": {
+                "enforce": "en",
+                "description": "All code-related content must be in English",
+                "includes": [
+                    "Variable names",
+                    "Method names",
+                    "Class names",
+                    "Namespace names",
+                    "Error messages",
+                    "Log messages"
+                ]
+            }
+        },
+        "logging": {
+            "levels": {
+                "error": {
+                    "description": "Critical errors that stop the entire crawling process",
+                    "examples": [
+                        "Cannot create browser/context",
+                        "Cannot connect to Azure Search",
+                        "Inaccessible root URL",
+                        "Unexpected exceptions in core logic"
+                    ]
+                },
+                "warning": {
+                    "description": "Issues affecting result quality but not stopping the process",
+                    "examples": [
+                        "Failed page load (404, 500, etc.)",
+                        "Invalid URL structure",
+                        "Page load timeout",
+                        "URL from different domain ignored"
+                    ]
+                },
+                "information": {
+                    "description": "Overall process status and milestones",
+                    "examples": [
+                        "Start/end of crawling",
+                        "Number of processed pages",
+                        "Found sitemap",
+                        "Reached limits (pages/depth)"
+                    ]
+                },
+                "debug": {
+                    "description": "Detailed operational information",
+                    "examples": [
+                        "URL being crawled",
+                        "Number of links found on a page",
+                        "Sitemap search attempts",
+                        "DOM selector matching results"
+                    ]
+                }
+            },
+            "principles": [
+                "Each message should be logged on exactly ONE level",
+                "Each level should be meaningful without the levels below",
+                "Critical debugging information should be on Warning or Error",
+                "Progress/status should be on Information",
+                "Technical details should be on Debug or Verbose"
+            ]
+        },
+        "code": {
+            "primaryConstructors": {
+                "useWhen": [
+                    "Simple classes with few fields",
+                    "Classes with straightforward initialization",
+                    "When the constructor body would be empty or very simple"
+                ],
+                "avoidWhen": [
+                    "Classes with many fields",
+                    "Complex initialization logic",
+                    "When using dependency injection with fixtures",
+                    "When the constructor body contains non-trivial logic"
+                ],
+                "suppression": {
+                    "comment": "Suppressing IDE0290 as the traditional constructor provides better readability in this case with multiple fields and fixtures. Primary constructor is more suitable for simpler classes.",
+                    "pragma": {
+                        "disable": "IDE0290",
+                        "restore": "IDE0290"
+                    }
+                }
+            },
+            "formatting": {
+                "indentation": "spaces",
+                "spacesPerIndent": 4,
+                "maxLineLength": 120,
+                "newlineAtEndOfFile": true,
+                "trimTrailingWhitespace": true
+            },
+            "coverage": {
+                "exclude": {
+                    "description": "Classes that can be excluded from code coverage",
+                    "criteria": [
+                        "Pure adapter classes with no business logic",
+                        "Classes used only in production as fallback mechanisms",
+                        "Classes that would require unreliable integration tests",
+                        "Classes that don't provide additional value when tested"
+                    ],
+                    "documentation": {
+                        "required": true,
+                        "format": "XML documentation comment explaining the exclusion",
+                        "example": "/// <summary>\n/// Adapter class that bridges System.CommandLine.IConsole to our own IConsole interface.\n/// This class is used only in production code as a fallback when running the actual CLI application.\n/// It's excluded from code coverage because:\n/// 1. It's a pure adapter with no business logic\n/// 2. In tests, we use TestConsole instead to capture and verify console output\n/// 3. Testing console output in production would require integration tests with the actual console,\n///    which would be unreliable and not provide additional value\n/// </summary>"
+                    }
+                }
+            }
+        },
+        "testing": {
+            "categories": {
+                "integration": {
+                    "description": "Tests that require external dependencies or services",
+                    "attribute": "[Trait(\"Category\", \"Integration\")]",
+                    "examples": [
+                        "TestWebsiteIntegrationTests",
+                        "TestSpaWebsiteFixture",
+                        "TestWebServer"
+                    ]
+                },
+                "unit": {
+                    "description": "Tests that run in isolation with mocked dependencies",
+                    "attribute": "[Trait(\"Category\", \"Unit\")]",
+                    "examples": [
+                        "HeadlessBrowserCrawlerTests",
+                        "SitemapCrawlerTests",
+                        "TextExtractorTests"
+                    ]
+                }
+            },
+            "structure": {
+                "maxFileSize": {
+                    "lines": 500,
+                    "description": "Maximum number of lines in a test file",
+                    "action": "Split into smaller, focused test files",
+                    "example": "AzureSearchIndexerTests.cs (1429 lines) should be split into multiple files"
+                },
+                "organization": {
+                    "description": "How to organize test files",
+                    "rules": [
+                        "One test class per production class",
+                        "Group related tests in separate files",
+                        "Use descriptive test method names",
+                        "Follow Arrange-Act-Assert pattern"
+                    ]
+                }
+            }
+        }
+    }
+} 

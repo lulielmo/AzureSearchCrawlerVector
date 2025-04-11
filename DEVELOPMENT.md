@@ -114,4 +114,118 @@ public TestWebsiteIntegrationTests(TestWebsiteFixture fixture, TestWebsite2Fixtu
     _console = console;
 }
 #pragma warning restore IDE0290 // Use primary constructor
-``` 
+```
+
+## Language Policy
+
+We maintain a clear language policy to ensure consistency and maintainability:
+
+### Documentation (English)
+All documentation must be in English, including:
+- XML documentation comments
+- README files
+- Development guidelines
+- API documentation
+- Code comments
+
+### Communication (Swedish allowed)
+Team communication can be in Swedish, including:
+- Pull request discussions
+- Code review comments
+- Team meetings
+- Internal documentation
+
+### Code (English)
+All code-related content must be in English, including:
+- Variable names
+- Method names
+- Class names
+- Namespace names
+- Error messages
+- Log messages
+
+This policy ensures that:
+1. Code remains accessible to international developers
+2. Documentation is consistent and searchable
+3. Team communication can be in the most natural language
+4. Error messages and logs are universally understandable
+
+## Test Categories
+
+We maintain clear separation between different types of tests:
+
+### Integration Tests
+Tests that require external dependencies or services:
+- Marked with `[Trait("Category", "Integration")]`
+- Examples:
+  - TestWebsiteIntegrationTests
+  - TestSpaWebsiteFixture
+  - TestWebServer
+- Used for testing:
+  - External service interactions
+  - Full system workflows
+  - End-to-end scenarios
+
+### Unit Tests
+Tests that run in isolation with mocked dependencies:
+- Marked with `[Trait("Category", "Unit")]`
+- Examples:
+  - HeadlessBrowserCrawlerTests
+  - SitemapCrawlerTests
+  - TextExtractorTests
+- Used for testing:
+  - Individual components
+  - Business logic
+  - Edge cases
+
+## Code Coverage
+
+We maintain high code coverage while being pragmatic about exclusions:
+
+### When to Exclude from Coverage
+Classes can be excluded from code coverage when they are:
+- Pure adapter classes with no business logic
+- Used only in production as fallback mechanisms
+- Would require unreliable integration tests
+- Don't provide additional value when tested
+
+### Documentation Requirements
+When excluding a class from coverage, we must:
+1. Add the `[ExcludeFromCodeCoverage]` attribute
+2. Provide a detailed XML documentation comment explaining:
+   - The class's purpose
+   - Why it's excluded
+   - Specific reasons for the exclusion
+
+Example:
+```csharp
+/// <summary>
+/// Adapter class that bridges System.CommandLine.IConsole to our own IConsole interface.
+/// This class is used only in production code as a fallback when running the actual CLI application.
+/// It's excluded from code coverage because:
+/// 1. It's a pure adapter with no business logic
+/// 2. In tests, we use TestConsole instead to capture and verify console output
+/// 3. Testing console output in production would require integration tests with the actual console,
+///    which would be unreliable and not provide additional value
+/// </summary>
+[ExcludeFromCodeCoverage]
+public class SystemConsoleAdapter
+```
+
+## Test Structure
+
+We maintain organized and maintainable test files:
+
+### File Size Limits
+- Maximum file size: 500 lines
+- Action: Split into smaller, focused test files
+- Example: AzureSearchIndexerTests.cs (1429 lines) should be split into multiple files
+
+### Organization Rules
+1. One test class per production class
+2. Group related tests in separate files
+3. Use descriptive test method names
+4. Follow Arrange-Act-Assert pattern
+5. Keep test setup and teardown clear and minimal
+6. Use fixtures for shared test resources
+7. Document test dependencies and assumptions 
