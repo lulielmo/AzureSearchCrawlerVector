@@ -3,16 +3,20 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace AzureSearchCrawler.Adapters;
 
+/// <summary>
+/// Adapter class that bridges System.CommandLine.IConsole to our own IConsole interface.
+/// This class is used only in production code as a fallback when running the actual CLI application.
+/// It's excluded from code coverage because:
+/// 1. It's a pure adapter with no business logic
+/// 2. In tests, we use TestConsole instead to capture and verify console output
+/// 3. Testing console output in production would require integration tests with the actual console,
+///    which would be unreliable and not provide additional value
+/// </summary>
 [ExcludeFromCodeCoverage]
-public class SystemConsoleAdapter : Interfaces.IConsole
+public class SystemConsoleAdapter(System.CommandLine.IConsole console) : Interfaces.IConsole
 {
-    private readonly System.CommandLine.IConsole _console;
+    private readonly System.CommandLine.IConsole _console = console;
     private bool _verbose;
-
-    public SystemConsoleAdapter(System.CommandLine.IConsole console)
-    {
-        _console = console;
-    }
 
     public void WriteLine(string message, LogLevel level = LogLevel.Information)
     {

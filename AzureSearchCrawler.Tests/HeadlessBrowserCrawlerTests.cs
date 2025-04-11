@@ -314,15 +314,10 @@ namespace AzureSearchCrawler.Tests
                 .ReturnsAsync(_contextMock.Object);
 
             _contextMock.Setup(c => c.NewPageAsync())
-                .ReturnsAsync(() =>
+                .Returns(() => 
                 {
-                    if (pageCount >= 3)
-                    {
-                        return null;
-                    }
-
                     pageCount++;
-                    return pages.Dequeue();
+                    return Task.FromResult<IPage>(pageCount > 3 ? null! : pages.Dequeue());
                 });
 
             var processorMock = new Mock<ICrawledPageProcessor>();

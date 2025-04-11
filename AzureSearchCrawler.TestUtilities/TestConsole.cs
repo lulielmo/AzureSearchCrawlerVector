@@ -1,25 +1,13 @@
-using System;
-using System.Collections.Generic;
-using AzureSearchCrawler.Interfaces;
-using AzureSearchCrawler.Models;
-
 namespace AzureSearchCrawler.TestUtilities
 {
     using AzureSearchCrawler.Models;
-    using System.CommandLine;
     using System.CommandLine.IO;
-    using System.IO;
     using System.Text;
 
     public class TestStandardStreamWriter(List<string> output) : IStandardStreamWriter
     {
         private readonly List<string> _output = output;
         private readonly StringBuilder _buffer = new();
-
-        //public TestStandardStreamWriter(List<string> output)
-        //{
-        //    _output = output;
-        //}
 
         public void Write(string? value)
         {
