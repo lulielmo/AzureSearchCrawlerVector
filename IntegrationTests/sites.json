@@ -8,4 +8,9 @@
       "uri": "http://localhost:5142/",
       "maxDepth": 5
     }
+    ,
+    {
+      "uri": "http://localhost:3000/",
+      "maxDepth": 5
+    }
   ]

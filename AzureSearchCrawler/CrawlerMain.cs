@@ -21,6 +21,9 @@ namespace AzureSearchCrawler
 
         private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
+        // Suppressing IDE0290 as the traditional constructor provides better readability
+        // in this case with multiple parameters and complex types. Primary constructor is more suitable for simpler classes.
+#pragma warning disable IDE0290 // Use primary constructor
         public CrawlerMain(
             Func<string, string, string, string, string, string, int, bool, TextExtractor, bool, Interfaces.IConsole, AzureSearchIndexer>? indexerFactory = null,
             Func<AzureSearchIndexer, CrawlMode, Interfaces.IConsole, IWebCrawlingStrategy>? crawlerFactory = null)
@@ -28,6 +31,7 @@ namespace AzureSearchCrawler
             _indexerFactory = indexerFactory ?? DefaultIndexerFactory;
             _crawlerFactory = crawlerFactory ?? DefaultCrawlerFactory;
         }
+#pragma warning restore IDE0290 // Use primary constructor
 
         internal static IWebCrawlingStrategy DefaultCrawlerFactory(AzureSearchIndexer indexer, CrawlMode mode, Interfaces.IConsole console)
         {

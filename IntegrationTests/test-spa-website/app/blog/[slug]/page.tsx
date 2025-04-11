@@ -1,14 +1,19 @@
-export default function BlogPost({ params }: { params: { slug: string } }) {
-  const post = posts.find(p => p.slug === params.slug);
+import { getPost } from '../posts';
+
+export default async function BlogPost({ params }: { params: { slug: string } }) {
+  // Extrahera slug först för att undvika direkt åtkomst
+  const slug = String(params.slug);
+  const post = await getPost(slug);
 
   if (!post) return <div>Post not found</div>;
 
   return (
     <article className="container mx-auto p-4">
       <h1 className="text-4xl font-bold mb-4">{post.title}</h1>
-      <div className="prose lg:prose-xl">
-        {post.content}
-      </div>
+      <div 
+        className="prose lg:prose-xl"
+        dangerouslySetInnerHTML={{ __html: post.content }}
+      />
     </article>
   );
 }
