@@ -24,6 +24,7 @@ namespace AzureSearchCrawler.Tests
     {
         private readonly Mock<IWebCrawler> _webCrawlerMock;
         private readonly Mock<ICrawledPageProcessor> _handlerMock;
+        private readonly Mock<CrawledPageQueue> _queueMock;
         private readonly TestConsole _console;
         private readonly AbotCrawler _crawler;
         private readonly StringWriter _stringWriter;
@@ -34,6 +35,7 @@ namespace AzureSearchCrawler.Tests
         {
             _webCrawlerMock = new Mock<IWebCrawler>();
             _handlerMock = new Mock<ICrawledPageProcessor>();
+            _queueMock = new Mock<CrawledPageQueue>();
             _console = new TestConsole();
             _stringWriter = new StringWriter();
             _originalOut = Console.Out;
@@ -42,7 +44,7 @@ namespace AzureSearchCrawler.Tests
             Console.SetOut(_stringWriter);
             Console.SetError(_stringWriter);
 
-            _crawler = new AbotCrawler(_handlerMock.Object, _ => _webCrawlerMock.Object, _console);
+            _crawler = new AbotCrawler(_queueMock.Object, _ => _webCrawlerMock.Object, _console);
         }
 
         private bool _disposed = false;
@@ -392,7 +394,7 @@ namespace AzureSearchCrawler.Tests
                     CrawlContext = new CrawlContext()
                 });
 
-            var crawler = new AbotCrawler(_handlerMock.Object, config =>
+            var crawler = new AbotCrawler(_queueMock.Object, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
@@ -501,7 +503,7 @@ namespace AzureSearchCrawler.Tests
             // Arrange
             var uri = new Uri("http://example.com");
             var testConsole = new TestConsole();
-            var crawler = new AbotCrawler(_handlerMock.Object, config =>
+            var crawler = new AbotCrawler(_queueMock.Object, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
@@ -548,7 +550,7 @@ namespace AzureSearchCrawler.Tests
             // Arrange
             var uri = new Uri("http://example.com");
             var testConsole = new TestConsole();
-            var crawler = new AbotCrawler(_handlerMock.Object, config =>
+            var crawler = new AbotCrawler(_queueMock.Object, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
@@ -599,6 +601,8 @@ namespace AzureSearchCrawler.Tests
             var mockSearchClient = new Mock<SearchClient>();
             var mockAiClient = new Mock<AzureOpenAIClient>();
             var mockEmbeddingClient = new Mock<EmbeddingClient>();
+
+            var queue = new CrawledPageQueue();
 
             var indexer = new AzureSearchIndexer(
                 "https://test.search.windows.net",
@@ -671,7 +675,7 @@ namespace AzureSearchCrawler.Tests
                     CrawlContext = new CrawlContext()
                 });
 
-            var crawler = new AbotCrawler(indexer, config =>
+            var crawler = new AbotCrawler(queue, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
@@ -715,7 +719,7 @@ namespace AzureSearchCrawler.Tests
             
             Func<Uri, CrawledPage, CrawlContext, bool>? linkDecisionMaker = null;
             
-            var crawler = new AbotCrawler(_handlerMock.Object, config =>
+            var crawler = new AbotCrawler(_queueMock.Object, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
@@ -766,7 +770,7 @@ namespace AzureSearchCrawler.Tests
             var testConsole = new TestConsole();
             testConsole.SetVerbose(false);
             
-            var crawler = new AbotCrawler(_handlerMock.Object, config =>
+            var crawler = new AbotCrawler(_queueMock.Object, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;

@@ -117,11 +117,12 @@ namespace AzureSearchCrawler.IntegrationTests
                 },
                 crawlerFactory: (indexer, mode, console) => 
                 {
+                    var queue = new CrawledPageQueue();
                     Console.WriteLine($"Creating crawler with mode: {mode}");
                     return mode switch
                     {
                         CrawlMode.Sitemap => new SitemapCrawler(indexer, console),
-                        CrawlMode.Standard => new AbotCrawler(indexer, console),
+                        CrawlMode.Standard => new AbotCrawler(queue, console),
                         CrawlMode.Headless => new HeadlessBrowserCrawler(indexer, console),
                         _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", nameof(mode))
                     };
@@ -247,11 +248,12 @@ namespace AzureSearchCrawler.IntegrationTests
                 },
                 crawlerFactory: (indexer, mode, console) => 
                 {
+                    var queue = new CrawledPageQueue();
                     Console.WriteLine($"Creating crawler with mode: {mode}");
                     return mode switch
                     {
                         CrawlMode.Sitemap => new SitemapCrawler(indexer, console),
-                        CrawlMode.Standard => new AbotCrawler(indexer, console),
+                        CrawlMode.Standard => new AbotCrawler(queue, console),
                         CrawlMode.Headless => new HeadlessBrowserCrawler(indexer, console),
                         _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", nameof(mode))
                     };
@@ -339,11 +341,12 @@ namespace AzureSearchCrawler.IntegrationTests
                 },
                 crawlerFactory: (indexer, mode, console) => 
                 {
+                    var queue = new CrawledPageQueue();
                     Console.WriteLine($"Creating crawler with mode: {mode}");
                     return mode switch
                     {
                         CrawlMode.Sitemap => new SitemapCrawler(indexer, console),
-                        CrawlMode.Standard => new AbotCrawler(indexer, console),
+                        CrawlMode.Standard => new AbotCrawler(queue, console),
                         CrawlMode.Headless => new HeadlessBrowserCrawler(indexer, console),
                         _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", nameof(mode))
                     };
@@ -427,11 +430,12 @@ namespace AzureSearchCrawler.IntegrationTests
                 },
                 crawlerFactory: (indexer, mode, console) => 
                 {
+                    var queue = new CrawledPageQueue();
                     Console.WriteLine($"Creating crawler with mode: {mode}");
                     return mode switch
                     {
                         CrawlMode.Sitemap => new SitemapCrawler(indexer, console),
-                        CrawlMode.Standard => new AbotCrawler(indexer, console),
+                        CrawlMode.Standard => new AbotCrawler(queue, console),
                         CrawlMode.Headless => new HeadlessBrowserCrawler(indexer, console),
                         _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", nameof(mode))
                     };
@@ -527,11 +531,12 @@ namespace AzureSearchCrawler.IntegrationTests
                     },
                     crawlerFactory: (indexer, mode, console) => 
                     {
+                        var queue = new CrawledPageQueue();
                         Console.WriteLine($"Creating crawler with mode: {mode}");
                         return mode switch
                         {
                             CrawlMode.Sitemap => new SitemapCrawler(indexer, console),
-                            CrawlMode.Standard => new AbotCrawler(indexer, console),
+                            CrawlMode.Standard => new AbotCrawler(queue, console),
                             CrawlMode.Headless => new HeadlessBrowserCrawler(indexer, console),
                             _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", nameof(mode))
                         };

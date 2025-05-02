@@ -20,20 +20,20 @@ namespace AzureSearchCrawler
         private bool _isDisposed;
         private readonly object _lock = new();
 
-        private readonly ICrawledPageProcessor _processor;
+        private readonly CrawledPageQueue _queue;
         private readonly Func<CrawlConfiguration, IWebCrawler> _webCrawlerFactory;
         private readonly IConsole _console;
         private string? _domSelector;
         private IWebCrawler? _crawler;
 
-        public AbotCrawler(ICrawledPageProcessor processor, IConsole console, string? domSelector = null)
-            : this(processor, config => new PoliteWebCrawler(config), console, domSelector)
+        public AbotCrawler(CrawledPageQueue queue, IConsole console, string? domSelector = null)
+            : this(queue, config => new PoliteWebCrawler(config), console, domSelector)
         {
         }
 
-        public AbotCrawler(ICrawledPageProcessor processor, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, IConsole console, string? domSelector = null)
+        public AbotCrawler(CrawledPageQueue queue, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, IConsole console, string? domSelector = null)
         {
-            _processor = processor ?? throw new ArgumentNullException(nameof(processor));
+            _queue = queue ?? throw new ArgumentNullException(nameof(queue));
             _webCrawlerFactory = crawlerFactory ?? throw new ArgumentNullException(nameof(crawlerFactory));
             _console = console ?? throw new ArgumentNullException(nameof(console));
             _pageCount = 0;
@@ -200,7 +200,7 @@ namespace AzureSearchCrawler
             }
             finally
             {
-                await _processor.CrawlFinishedAsync();
+                _queue.MarkAsComplete();
                 
                 lock (_lock)
                 {
@@ -248,7 +248,14 @@ namespace AzureSearchCrawler
 
                 try
                 {
-                    await _processor.PageCrawledAsync(e.CrawledPage);
+                    var page = new CrawledWebPage(
+                        e.CrawledPage.Uri,
+                        e.CrawledPage.AngleSharpHtmlDocument?.QuerySelector("title")?.TextContent ?? string.Empty,
+                        e.CrawledPage.AngleSharpHtmlDocument?.Body?.TextContent ?? string.Empty,
+                        (int)e.CrawledPage.HttpResponseMessage.StatusCode,
+                        null);
+
+                    _queue.Enqueue(page);
                     tcs.TrySetResult();
                 }
                 catch (Exception ex)

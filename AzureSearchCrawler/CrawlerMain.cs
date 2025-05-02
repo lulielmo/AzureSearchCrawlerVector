@@ -35,13 +35,41 @@ namespace AzureSearchCrawler
 
         internal static IWebCrawlingStrategy DefaultCrawlerFactory(AzureSearchIndexer indexer, CrawlMode mode, Interfaces.IConsole console)
         {
-            return mode switch
+            var queue = new CrawledPageQueue();
+            var processor = new VectorizedPageProcessor(
+                indexer.Endpoint,
+                indexer.IndexName,
+                indexer.AdminApiKey,
+                indexer.EmbeddingEndpoint,
+                indexer.EmbeddingKey,
+                indexer.EmbeddingDeployment,
+                indexer.EmbeddingDimensions,
+                console,
+                queue);
+
+            IWebCrawlingStrategy crawler = mode switch
             {
                 CrawlMode.Sitemap => new SitemapCrawler(indexer, console),
-                CrawlMode.Standard => new AbotCrawler(indexer, console),
+                CrawlMode.Standard => new AbotCrawler(queue, console),
                 CrawlMode.Headless => new HeadlessBrowserCrawler(indexer, console),
                 _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", nameof(mode))
             };
+
+            // Starta processor i bakgrunden
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await processor.ProcessQueueAsync();
+                }
+                catch (Exception ex)
+                {
+                    console.WriteLine($"Error in processor: {ex.Message}", LogLevel.Error);
+                    console.WriteLine($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
+                }
+            });
+
+            return crawler;
         }
 
         private static AzureSearchIndexer DefaultIndexerFactory(

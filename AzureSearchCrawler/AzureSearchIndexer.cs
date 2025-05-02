@@ -48,6 +48,14 @@ namespace AzureSearchCrawler
             set => _searchClient = value;
         }
 
+        public string Endpoint => _searchServiceEndpoint;
+        public string IndexName => _indexName;
+        public string AdminApiKey => _adminApiKey;
+        public string EmbeddingEndpoint => _embeddingAiEndpoint;
+        public string EmbeddingKey => _embeddingAiAdminApiKey;
+        public string EmbeddingDeployment => _embeddingDeployment;
+        public int EmbeddingDimensions => _azureOpenAIEmbeddingDimensions;
+
         public AzureSearchIndexer(
             string searchServiceEndpoint,
             string indexName,
