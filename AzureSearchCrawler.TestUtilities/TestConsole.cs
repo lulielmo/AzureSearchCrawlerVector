@@ -8,13 +8,14 @@ namespace AzureSearchCrawler.TestUtilities
     {
         private readonly List<string> _output = output;
         private readonly StringBuilder _buffer = new();
+        private const int MaxBufferSize = 10 * 1024 * 1024; // 10MB
 
         public void Write(string? value)
         {
             if (value != null)
             {
                 _buffer.Append(value);
-                if (value.EndsWith(Environment.NewLine))
+                if (value.EndsWith(Environment.NewLine) || _buffer.Length > MaxBufferSize)
                 {
                     _output.Add(_buffer.ToString().TrimEnd());
                     _buffer.Clear();

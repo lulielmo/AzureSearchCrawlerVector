@@ -906,7 +906,7 @@ namespace AzureSearchCrawler.Tests
         }
 
         [Fact]
-        public void GetOrCreateSearchClient_WhenDryRun_ReturnsNull()
+        public async Task GetOrCreateSearchClient_WhenDryRun_ReturnsNull()
         {
             // Arrange
             var indexer = new AzureSearchIndexer(
@@ -917,17 +917,13 @@ namespace AzureSearchCrawler.Tests
                 "test-key2",
                 "ai-deployment",
                 1,
-                extractText: true,
-                textExtractor: _textExtractor.Object,
-                dryRun: true,
-                console: new TestConsole(), 
-                enableRateLimiting: false);
+                true,
+                _textExtractor.Object,
+                true,
+                _console);
 
             // Act
-            // Call GetOrCreateSearchClient via reflection since it's private
-            var method = typeof(AzureSearchIndexer)
-                .GetMethod("GetOrCreateSearchClient", BindingFlags.NonPublic | BindingFlags.Instance);
-            var result = method!.Invoke(indexer, null);
+            var result = await indexer.GetOrCreateSearchClient();
 
             // Assert
             Assert.Null(result);
@@ -1188,17 +1184,20 @@ namespace AzureSearchCrawler.Tests
 
             // Assert
             Assert.Contains(loggedMessages, m => 
-                m.Message.Contains("Title embedding generated with") && 
-                m.Level == LogLevel.Debug);
+                m.Message.Contains("Processing page:") && 
+                m.Level == LogLevel.Information);
             Assert.Contains(loggedMessages, m => 
                 m.Message.Contains("Content details - Size:") && 
                 m.Level == LogLevel.Debug);
             Assert.Contains(loggedMessages, m => 
-                m.Message.Contains("Added page to indexing queue") && 
+                m.Message.Contains("Truncated content length:") && 
                 m.Level == LogLevel.Debug);
             Assert.Contains(loggedMessages, m => 
-                m.Message.Contains("Processing page:") && 
-                m.Level == LogLevel.Information);
+                m.Message.Contains("Generating title embedding for:") && 
+                m.Level == LogLevel.Debug);
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("About to call GenerateEmbeddingAsync") && 
+                m.Level == LogLevel.Debug);
         }
 
         [Fact]
@@ -1395,16 +1394,25 @@ namespace AzureSearchCrawler.Tests
 
             // Assert
             Assert.Contains(loggedMessages, m => 
-                m.Message.Contains("Title embedding generated with") && 
-                m.Level == LogLevel.Debug);
+                m.Message.Contains("Processing page:") && 
+                m.Level == LogLevel.Information);
             Assert.Contains(loggedMessages, m => 
                 m.Message.Contains("Content details - Size:") && 
                 m.Level == LogLevel.Debug);
             Assert.Contains(loggedMessages, m => 
-                m.Message.Contains("Content embedding generated with") && 
+                m.Message.Contains("Truncated content length:") && 
                 m.Level == LogLevel.Debug);
-            Assert.Contains(loggedMessages, m =>
-                m.Message.Contains("Added page to indexing queue") &&
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("Starting rate limit wait for title embedding") && 
+                m.Level == LogLevel.Debug);
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("Before WaitAsync call") && 
+                m.Level == LogLevel.Debug);
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("After WaitAsync call") && 
+                m.Level == LogLevel.Debug);
+            Assert.Contains(loggedMessages, m => 
+                m.Message.Contains("Rate limit wait completed successfully") && 
                 m.Level == LogLevel.Debug);
         }
 

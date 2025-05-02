@@ -12,6 +12,10 @@ using Microsoft.Playwright;
 using Azure.Search.Documents;
 using Azure.AI.OpenAI;
 using OpenAI.Embeddings;
+using System;
+using System.Threading.Tasks;
+using System.Net;
+using System.Threading;
 
 namespace AzureSearchCrawler.Tests
 {
@@ -165,28 +169,44 @@ namespace AzureSearchCrawler.Tests
                 CrawlContext = new CrawlContext()
             };
 
+            var pageProcessed = new TaskCompletionSource<bool>();
             var eventRaised = new TaskCompletionSource<bool>();
 
             _webCrawlerMock
                 .Setup(c => c.CrawlAsync(It.IsAny<Uri>()))
                 .Callback(() =>
                 {
-                    // Wait until the event handler is registered
-                    Task.Delay(100).ContinueWith(_ =>
-                    {
-                        var args = new PageCrawlCompletedArgs(new CrawlContext(), crawledPage);
-                        _webCrawlerMock.Raise(c => c.PageCrawlCompleted += null, _webCrawlerMock.Object, args);
-                        eventRaised.SetResult(true);
-                    });
+                    // Trigger the event when CrawlAsync is called
+                    var args = new PageCrawlCompletedArgs(new CrawlContext(), crawledPage);
+                    _webCrawlerMock.Raise(c => c.PageCrawlCompleted += null, _webCrawlerMock.Object, args);
+                    eventRaised.SetResult(true);
                 })
                 .ReturnsAsync(crawlResult);
 
+            _handlerMock
+                .Setup(h => h.PageCrawledAsync(It.Is<CrawledPage>(p => 
+                    p.Uri == uri && 
+                    p.Content.Text == "Some content" && 
+                    p.HttpResponseMessage.StatusCode == HttpStatusCode.OK)))
+                .Callback(() => pageProcessed.SetResult(true))
+                .Returns(Task.CompletedTask);
+
             // Act
             var crawlTask = _crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1);
-            await Task.WhenAll(crawlTask, eventRaised.Task);
+            
+            // Wait for both the crawl to complete and the page to be processed
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await Task.WhenAny(
+                Task.WhenAll(crawlTask, pageProcessed.Task, eventRaised.Task),
+                Task.Delay(-1, cts.Token));
 
             // Assert
-            _handlerMock.Verify(h => h.PageCrawledAsync(crawledPage), Times.Once);
+            Assert.True(eventRaised.Task.IsCompleted, "PageCrawlCompleted event was not raised");
+            _handlerMock.Verify(h => h.PageCrawledAsync(It.Is<CrawledPage>(p => 
+                p.Uri == uri && 
+                p.Content.Text == "Some content" && 
+                p.HttpResponseMessage.StatusCode == HttpStatusCode.OK)), 
+                Times.Once);
         }
 
         [Fact]

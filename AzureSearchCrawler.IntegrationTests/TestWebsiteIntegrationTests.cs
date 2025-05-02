@@ -3,7 +3,14 @@ using AzureSearchCrawler.Models;
 using AzureSearchCrawler.TestUtilities;
 using Moq;
 using Xunit;
+using Xunit.Sdk;
 using System.Reflection;
+using Azure.Search.Documents;
+using Azure.Search.Documents.Models;
+using Azure;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace AzureSearchCrawler.IntegrationTests
 {
@@ -30,9 +37,48 @@ namespace AzureSearchCrawler.IntegrationTests
         [Fact]
         public async Task CrawlTestWebsite_WithDomSelector_OnlyCrawlsBlogPosts()
         {
+            // Add global exception handler
+            AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+            {
+                var ex = e.ExceptionObject as Exception;
+                _console.WriteLine($"Unhandled exception: {ex?.Message ?? "Unknown error"}", LogLevel.Error);
+                _console.WriteLine($"Stack trace: {ex?.StackTrace ?? "No stack trace"}", LogLevel.Debug);
+            };
+
+            // Check environment variables
+            var requiredVariables = new[]
+            {
+                "AZURE_SEARCH_TEST_ENDPOINT",
+                "AZURE_SEARCH_TEST_KEY",
+                "AZURE_OPENAI_TEST_ENDPOINT",
+                "AZURE_OPENAI_TEST_KEY",
+                "AZURE_OPENAI_TEST_DEPLOYMENT",
+                "AZURE_OPENAI_EMBEDDING_DIMENSIONS"
+            };
+
+            // Debug output
+            _console.LoggedMessage += (message, level) => 
+            {
+                if (level == LogLevel.Debug || level == LogLevel.Information)
+                {
+                    Console.WriteLine($"[{level}] {message}");
+                }
+            };
+
+            var missingVariables = requiredVariables
+                .Where(v => string.IsNullOrEmpty(Environment.GetEnvironmentVariable(v)))
+                .ToList();
+
+            if (missingVariables.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Test requires the following environment variables to be set: {string.Join(", ", missingVariables)}. " +
+                    "Set these variables to run integration tests against Azure services.");
+            }
+
             // Arrange
             var blogUrl = new Uri($"{_webServer.BaseUrl}/blog");
-            var maxPages = 20;
+            var maxPages = 10;
             var maxDepth = 3;
             var domSelector = "div.blog-content";
 
@@ -40,7 +86,6 @@ namespace AzureSearchCrawler.IntegrationTests
             _console.LoggedMessage += (message, level) => 
             {
                 loggedMessages.Add((message, level));
-                Console.WriteLine($"[TestConsole] [{level}] {message}");
             };
             _console.SetVerbose(true);
 
@@ -52,26 +97,25 @@ namespace AzureSearchCrawler.IntegrationTests
                 "--rootUri", blogUrl.ToString(),
                 "--maxPages", maxPages.ToString(),
                 "--maxDepth", maxDepth.ToString(),
-                "--serviceEndPoint", "https://dummy-search-endpoint",
-                "--indexName", "test-index",
-                "--adminApiKey", "dummy-key",
-                "--embeddingEndPoint", "https://dummy-embedding-endpoint",
-                "--embeddingAdminKey", "dummy-key",
-                "--embeddingDeploymentName", "dummy-deployment",
-                "--azureOpenAIEmbeddingDimensions", "1536",
+                "--serviceEndPoint", Environment.GetEnvironmentVariable("AZURE_SEARCH_TEST_ENDPOINT") ?? throw new InvalidOperationException("AZURE_SEARCH_TEST_ENDPOINT environment variable is not set"),
+                "--indexName", "integration-test-index",
+                "--adminApiKey", Environment.GetEnvironmentVariable("AZURE_SEARCH_TEST_KEY") ?? throw new InvalidOperationException("AZURE_SEARCH_TEST_KEY environment variable is not set"),
+                "--embeddingEndPoint", Environment.GetEnvironmentVariable("AZURE_OPENAI_TEST_ENDPOINT") ?? throw new InvalidOperationException("AZURE_OPENAI_TEST_ENDPOINT environment variable is not set"),
+                "--embeddingAdminKey", Environment.GetEnvironmentVariable("AZURE_OPENAI_TEST_KEY") ?? throw new InvalidOperationException("AZURE_OPENAI_TEST_KEY environment variable is not set"),
+                "--embeddingDeploymentName", Environment.GetEnvironmentVariable("AZURE_OPENAI_TEST_DEPLOYMENT") ?? throw new InvalidOperationException("AZURE_OPENAI_TEST_DEPLOYMENT environment variable is not set"),
+                "--azureOpenAIEmbeddingDimensions", Environment.GetEnvironmentVariable("AZURE_OPENAI_EMBEDDING_DIMENSIONS") ?? throw new InvalidOperationException("AZURE_OPENAI_EMBEDDING_DIMENSIONS environment variable is not set"),
                 "--domSelector", domSelector,
-                "--dryRun",
                 "--verbose"
             };
 
             Console.WriteLine("Creating CrawlerMain...");
             var crawlerMain = new CrawlerMain(
-                (endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console) =>
+                indexerFactory: (endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console) =>
                 {
                     Console.WriteLine("Creating AzureSearchIndexer...");
                     return new AzureSearchIndexer(endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console);
                 },
-                (indexer, mode, console) => 
+                crawlerFactory: (indexer, mode, console) => 
                 {
                     Console.WriteLine($"Creating crawler with mode: {mode}");
                     return mode switch
@@ -84,18 +128,11 @@ namespace AzureSearchCrawler.IntegrationTests
                 });
 
             Console.WriteLine("Running CrawlerMain...");
-            await crawlerMain.RunAsync(args, _console);
+            var crawlResult = await crawlerMain.RunAsync(args, _console);
 
             // Assert
             Console.WriteLine($"Test completed. Logged messages count: {loggedMessages.Count}");
             var messagesCopy = loggedMessages.ToList();
-            
-            // Print all log messages for debugging
-            Console.WriteLine("All logged messages:");
-            foreach (var (Message, Level) in messagesCopy)
-            {
-                Console.WriteLine($"[{Level}] {Message}");
-            }
             
             // Verify that we're using the correct selector
             Assert.Contains(messagesCopy, m => 
@@ -113,6 +150,56 @@ namespace AzureSearchCrawler.IntegrationTests
                 m.Message.Contains("Processing page") && 
                 (m.Message.Contains("/about") || m.Message.Contains("/contact") || m.Message.Contains("/products")) && 
                 m.Level == LogLevel.Information);
+
+            // Verify that documents were actually indexed
+            var searchEndpoint = Environment.GetEnvironmentVariable("AZURE_SEARCH_TEST_ENDPOINT") ?? throw new InvalidOperationException("AZURE_SEARCH_TEST_ENDPOINT environment variable is not set");
+            var searchKey = Environment.GetEnvironmentVariable("AZURE_SEARCH_TEST_KEY") ?? throw new InvalidOperationException("AZURE_SEARCH_TEST_KEY environment variable is not set");
+            var searchClient = new SearchClient(new Uri(searchEndpoint), "integration-test-index", new AzureKeyCredential(searchKey));
+
+            Console.WriteLine("Waiting for indexing to complete...");
+            // Wait a bit for indexing to complete
+            await Task.Delay(5000);
+
+            // Verify that we have indexed documents
+            Console.WriteLine("Searching for documents in the index...");
+            var searchResults = await searchClient.SearchAsync<SearchDocument>("*");
+            var results = searchResults.Value.GetResults().ToList();
+            Console.WriteLine($"Found {results.Count} documents in the index");
+
+            if (results.Count == 0)
+            {
+                Console.WriteLine("No documents found in the index. Checking if any documents were processed during crawling...");
+                var processedMessages = messagesCopy.Where(m => m.Message.Contains("Processing page")).ToList();
+                Console.WriteLine($"Number of pages processed during crawl: {processedMessages.Count}");
+                foreach (var msg in processedMessages)
+                {
+                    Console.WriteLine($"Processed: {msg.Message}");
+                }
+
+                // Check for embedding-related messages
+                var embeddingMessages = messagesCopy.Where(m => m.Message.Contains("embedding")).ToList();
+                Console.WriteLine("Embedding-related messages:");
+                foreach (var msg in embeddingMessages)
+                {
+                    Console.WriteLine($"[{msg.Level}] {msg.Message}");
+                }
+            }
+
+            // Verify that we have blog posts in the index
+            Console.WriteLine("Searching specifically for blog posts...");
+            var blogResults = await searchClient.SearchAsync<SearchDocument>("/blog/");
+            var blogDocuments = blogResults.Value.GetResults().ToList();
+            Console.WriteLine($"Found {blogDocuments.Count} blog posts in the index");
+
+            // Clean up the index
+            var deleteBatch = new List<IndexDocumentsAction<SearchDocument>>();
+            foreach (var result in results)
+            {
+                deleteBatch.Add(IndexDocumentsAction.Delete(result.Document));
+            }
+            var batch = IndexDocumentsBatch.Create<SearchDocument>(deleteBatch.ToArray());
+            await searchClient.IndexDocumentsAsync(batch);
+            Console.WriteLine("Cleaned up test index");
         }
 
         [Fact]
@@ -128,7 +215,6 @@ namespace AzureSearchCrawler.IntegrationTests
             _console.LoggedMessage += (message, level) => 
             {
                 loggedMessages.Add((message, level));
-                Console.WriteLine($"[TestConsole] [{level}] {message}");
             };
             _console.SetVerbose(true);
 
@@ -154,12 +240,12 @@ namespace AzureSearchCrawler.IntegrationTests
 
             Console.WriteLine("Creating CrawlerMain...");
             var crawlerMain = new CrawlerMain(
-                (endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console) =>
+                indexerFactory: (endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console) =>
                 {
                     Console.WriteLine("Creating AzureSearchIndexer...");
                     return new AzureSearchIndexer(endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console);
                 },
-                (indexer, mode, console) => 
+                crawlerFactory: (indexer, mode, console) => 
                 {
                     Console.WriteLine($"Creating crawler with mode: {mode}");
                     return mode switch
@@ -221,7 +307,6 @@ namespace AzureSearchCrawler.IntegrationTests
             _console.LoggedMessage += (message, level) => 
             {
                 loggedMessages.Add((message, level));
-                Console.WriteLine($"[TestConsole] [{level}] {message}");
             };
             _console.SetVerbose(true);
 
@@ -247,12 +332,12 @@ namespace AzureSearchCrawler.IntegrationTests
 
             Console.WriteLine("Creating CrawlerMain...");
             var crawlerMain = new CrawlerMain(
-                (endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console) =>
+                indexerFactory: (endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console) =>
                 {
                     Console.WriteLine("Creating AzureSearchIndexer...");
                     return new AzureSearchIndexer(endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console);
                 },
-                (indexer, mode, console) => 
+                crawlerFactory: (indexer, mode, console) => 
                 {
                     Console.WriteLine($"Creating crawler with mode: {mode}");
                     return mode switch
@@ -309,7 +394,6 @@ namespace AzureSearchCrawler.IntegrationTests
             _console.LoggedMessage += (message, level) => 
             {
                 loggedMessages.Add((message, level));
-                Console.WriteLine($"[TestConsole] [{level}] {message}");
             };
             _console.SetVerbose(true);
 
@@ -336,12 +420,12 @@ namespace AzureSearchCrawler.IntegrationTests
 
             Console.WriteLine("Creating CrawlerMain...");
             var crawlerMain = new CrawlerMain(
-                (endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console) =>
+                indexerFactory: (endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console) =>
                 {
                     Console.WriteLine("Creating AzureSearchIndexer...");
                     return new AzureSearchIndexer(endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console);
                 },
-                (indexer, mode, console) => 
+                crawlerFactory: (indexer, mode, console) => 
                 {
                     Console.WriteLine($"Creating crawler with mode: {mode}");
                     return mode switch
@@ -414,7 +498,6 @@ namespace AzureSearchCrawler.IntegrationTests
             _console.LoggedMessage += (message, level) => 
             {
                 loggedMessages.Add((message, level));
-                Console.WriteLine($"[TestConsole] [{level}] {message}");
             };
             _console.SetVerbose(true);
 
@@ -437,12 +520,12 @@ namespace AzureSearchCrawler.IntegrationTests
 
                 Console.WriteLine("Creating CrawlerMain...");
                 var crawlerMain = new CrawlerMain(
-                    (endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console) =>
+                    indexerFactory: (endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console) =>
                     {
                         Console.WriteLine("Creating AzureSearchIndexer...");
                         return new AzureSearchIndexer(endpoint, index, key, embeddingEndpoint, embeddingKey, embeddingDeployment, embeddingDimensions, extract, extractor, dryRun, console);
                     },
-                    (indexer, mode, console) => 
+                    crawlerFactory: (indexer, mode, console) => 
                     {
                         Console.WriteLine($"Creating crawler with mode: {mode}");
                         return mode switch

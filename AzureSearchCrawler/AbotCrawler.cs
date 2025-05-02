@@ -3,6 +3,8 @@ using Abot2.Poco;
 using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
 using System.Net;
+using System.Threading;
+using System.Collections.Concurrent;
 
 namespace AzureSearchCrawler
 {
@@ -12,12 +14,17 @@ namespace AzureSearchCrawler
     /// </summary>
     public class AbotCrawler : IWebCrawlingStrategy
     {
+        private readonly TaskCompletionSource<Exception> _crawlError = new();
+        private readonly ConcurrentDictionary<Uri, TaskCompletionSource> _activePages = new();
         private int _pageCount;
+        private bool _isDisposed;
+        private readonly object _lock = new();
 
         private readonly ICrawledPageProcessor _processor;
         private readonly Func<CrawlConfiguration, IWebCrawler> _webCrawlerFactory;
         private readonly IConsole _console;
         private string? _domSelector;
+        private IWebCrawler? _crawler;
 
         public AbotCrawler(ICrawledPageProcessor processor, IConsole console, string? domSelector = null)
             : this(processor, config => new PoliteWebCrawler(config), console, domSelector)
@@ -38,61 +45,133 @@ namespace AzureSearchCrawler
 
         public async Task CrawlAsync(Uri rootUri, int maxPages, int maxDepth, string? domSelector = null)
         {
-            _pageCount = 0;
-
-            if (maxPages <= 0)
-                throw new ArgumentException("maxPages must be greater than 0", nameof(maxPages));
-
-            if (maxDepth <= 0)
-                throw new ArgumentException("maxDepth must be greater than 0", nameof(maxDepth));
-
-            if (domSelector != null)
+            if (_isDisposed)
             {
-                _domSelector = domSelector;
+                throw new ObjectDisposedException(nameof(AbotCrawler));
             }
 
             var config = CreateCrawlConfiguration(maxPages, maxDepth);
-            var crawler = _webCrawlerFactory(config);
 
-            crawler.PageCrawlStarting += Crawler_ProcessPageCrawlStarting;
-            crawler.PageCrawlCompleted += Crawler_ProcessPageCrawlCompleted;
-            
-            _console.WriteLine($"Starting web crawl of {rootUri.AbsoluteUri}", LogLevel.Information);
-            _console.WriteLine($"Crawl configuration: Max pages={maxPages}, Max depth={maxDepth}, Concurrent threads={config.MaxConcurrentThreads}", LogLevel.Information);
-            _console.WriteLine($"Performance settings: Timeout={config.CrawlTimeoutSeconds}s, Delay between requests={config.MinCrawlDelayPerDomainMilliSeconds}ms", LogLevel.Debug);
-            _console.WriteLine($"Request configuration: User-Agent='{config.UserAgentString}'", LogLevel.Debug);
-            
-            if (_domSelector != null)
+            lock (_lock)
             {
-                _console.WriteLine($"Using DOM selector filter: {_domSelector}", LogLevel.Information);
-                crawler.ShouldScheduleLinkDecisionMaker = (uri, crawledPage, crawlContext) =>
+                if (_crawler != null)
                 {
-                    if (crawledPage.AngleSharpHtmlDocument == null)
-                    {
-                        _console.WriteLine($"Skipping link evaluation - No HTML document available for {uri.AbsoluteUri}", LogLevel.Debug);
-                        return true;
-                    }
+                    throw new InvalidOperationException("Crawler is already running");
+                }
 
-                    _console.WriteLine($"Evaluating link against selector '{_domSelector}': {uri.AbsoluteUri}", LogLevel.Verbose);
-                    var links = crawledPage.AngleSharpHtmlDocument
-                        .QuerySelectorAll($"{_domSelector} a")
-                        .Where(a => a.OuterHtml.Contains(uri.LocalPath));
+                _pageCount = 0;
+                _activePages.Clear();
+                _crawlError.TrySetResult(null!);
 
-                    var shouldCrawl = links.Any();
-                    if (!shouldCrawl)
-                    {
-                        _console.WriteLine($"Filtered out link that does not match selector: {uri.AbsoluteUri}", LogLevel.Debug);
-                    }
-                    
-                    return shouldCrawl;
-                };
+                if (maxPages <= 0)
+                    throw new ArgumentException("maxPages must be greater than 0", nameof(maxPages));
+
+                if (maxDepth <= 0)
+                    throw new ArgumentException("maxDepth must be greater than 0", nameof(maxDepth));
+
+                if (domSelector != null)
+                {
+                    _domSelector = domSelector;
+                }
+
+                _crawler = _webCrawlerFactory(config);
+
+                _crawler.PageCrawlStarting += Crawler_ProcessPageCrawlStarting;
+                _crawler.PageCrawlCompleted += Crawler_ProcessPageCrawlCompleted;
             }
-
+            
             try
             {
+                _console.WriteLine($"Starting web crawl of {rootUri.AbsoluteUri}", LogLevel.Information);
+                _console.WriteLine($"Crawl configuration: Max pages={maxPages}, Max depth={maxDepth}, Concurrent threads={config.MaxConcurrentThreads}", LogLevel.Information);
+                _console.WriteLine($"Performance settings: Timeout={config.CrawlTimeoutSeconds}s, Delay between requests={config.MinCrawlDelayPerDomainMilliSeconds}ms", LogLevel.Debug);
+                _console.WriteLine($"Request configuration: User-Agent='{config.UserAgentString}'", LogLevel.Debug);
+                
+                if (_domSelector != null)
+                {
+                    _console.WriteLine($"Using DOM selector filter: {_domSelector}", LogLevel.Information);
+                    _crawler.ShouldScheduleLinkDecisionMaker = (uri, crawledPage, crawlContext) =>
+                    {
+                        if (crawledPage.AngleSharpHtmlDocument == null)
+                        {
+                            _console.WriteLine($"Skipping link evaluation - No HTML document available for {uri.AbsoluteUri}", LogLevel.Debug);
+                            return true;
+                        }
+
+                        _console.WriteLine($"Evaluating link against selector '{_domSelector}': {uri.AbsoluteUri}", LogLevel.Verbose);
+                        var links = crawledPage.AngleSharpHtmlDocument
+                            .QuerySelectorAll($"{_domSelector} a")
+                            .Where(a => a.OuterHtml.Contains(uri.LocalPath));
+
+                        var shouldCrawl = links.Any();
+                        if (!shouldCrawl)
+                        {
+                            _console.WriteLine($"Filtered out link that does not match selector: {uri.AbsoluteUri}", LogLevel.Debug);
+                        }
+                        
+                        return shouldCrawl;
+                    };
+                }
+
                 var startTime = DateTime.Now;
-                var result = await crawler.CrawlAsync(rootUri);
+                var result = await _crawler.CrawlAsync(rootUri);
                 var duration = DateTime.Now - startTime;
+
+                // Wait for all pages to finish processing with a timeout
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                try 
+                {
+                    while (_activePages.Count > 0 && !cts.Token.IsCancellationRequested)
+                    {
+                        _console.WriteLine($"Waiting for {_activePages.Count} pages to finish processing...", LogLevel.Debug);
+                        
+                        // Create a list of tasks with timeout
+                        var tasks = _activePages.Values.Select(tcs => tcs.Task).ToList();
+                        if (!tasks.Any()) break;
+
+                        try
+                        {
+                            await Task.WhenAll(tasks.ToArray());
+                            break;
+                        }
+                        catch (Exception ex)
+                        {
+                            _console.WriteLine($"Error while waiting for pages: {ex.Message}", LogLevel.Warning);
+                            // Continue waiting for other pages
+                        }
+
+                        await Task.Delay(1000, cts.Token);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    _console.WriteLine("Timeout while waiting for pages to complete", LogLevel.Warning);
+                }
+                finally
+                {
+                    // Clean up any remaining pages
+                    foreach (var page in _activePages.Keys.ToList())
+                    {
+                        if (_activePages.TryRemove(page, out var pendingTcs))
+                        {
+                            try
+                            {
+                                pendingTcs.TrySetCanceled();
+                            }
+                            catch (InvalidOperationException)
+                            {
+                                // Task was already completed
+                            }
+                        }
+                    }
+                }
+
+                // Check if we had any errors during crawling
+                var error = await _crawlError.Task;
+                if (error != null)
+                {
+                    throw error;
+                }
 
                 if (result.ErrorOccurred)
                 {
@@ -122,6 +201,17 @@ namespace AzureSearchCrawler
             finally
             {
                 await _processor.CrawlFinishedAsync();
+                
+                lock (_lock)
+                {
+                    if (_crawler != null)
+                    {
+                        _crawler.PageCrawlStarting -= Crawler_ProcessPageCrawlStarting;
+                        _crawler.PageCrawlCompleted -= Crawler_ProcessPageCrawlCompleted;
+                        _crawler.Dispose();
+                        _crawler = null;
+                    }
+                }
             }
         }
 
@@ -133,26 +223,45 @@ namespace AzureSearchCrawler
 
         private async void Crawler_ProcessPageCrawlCompleted(object? sender, PageCrawlCompletedArgs e)
         {
-            if (e.CrawledPage.HttpRequestException != null)
+            var tcs = new TaskCompletionSource();
+            if (!_activePages.TryAdd(e.CrawledPage.Uri, tcs))
             {
-                _console.WriteLine($"Error crawling {e.CrawledPage.Uri.AbsoluteUri}: {e.CrawledPage.HttpRequestException.Message}", LogLevel.Warning);
-                return;
-            }
-
-            if (e.CrawledPage.HttpResponseMessage.StatusCode != HttpStatusCode.OK)
-            {
-                _console.WriteLine($"Received non-200 status code {e.CrawledPage.HttpResponseMessage.StatusCode} for {e.CrawledPage.Uri.AbsoluteUri}", LogLevel.Warning);
+                // Page is already being processed
                 return;
             }
 
             try
             {
-                await _processor.PageCrawledAsync(e.CrawledPage);
+                if (e.CrawledPage.HttpRequestException != null)
+                {
+                    _console.WriteLine($"Error crawling {e.CrawledPage.Uri.AbsoluteUri}: {e.CrawledPage.HttpRequestException.Message}", LogLevel.Warning);
+                    tcs.TrySetResult();
+                    return;
+                }
+
+                if (e.CrawledPage.HttpResponseMessage.StatusCode != HttpStatusCode.OK)
+                {
+                    _console.WriteLine($"Received non-200 status code {e.CrawledPage.HttpResponseMessage.StatusCode} for {e.CrawledPage.Uri.AbsoluteUri}", LogLevel.Warning);
+                    tcs.TrySetResult();
+                    return;
+                }
+
+                try
+                {
+                    await _processor.PageCrawledAsync(e.CrawledPage);
+                    tcs.TrySetResult();
+                }
+                catch (Exception ex)
+                {
+                    _console.WriteLine($"Error processing {e.CrawledPage.Uri.AbsoluteUri}: {ex.Message}", LogLevel.Error);
+                    _console.WriteLine($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
+                    _crawlError.TrySetResult(ex);
+                    tcs.TrySetException(ex);
+                }
             }
-            catch (Exception ex)
+            finally
             {
-                _console.WriteLine($"Error processing {e.CrawledPage.Uri.AbsoluteUri}: {ex.Message}", LogLevel.Error);
-                _console.WriteLine($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
+                _activePages.TryRemove(e.CrawledPage.Uri, out _);
             }
         }
 
@@ -172,6 +281,24 @@ namespace AzureSearchCrawler
             };
 
             return crawlConfig;
+        }
+
+        public void Dispose()
+        {
+            if (!_isDisposed)
+            {
+                _isDisposed = true;
+                lock (_lock)
+                {
+                    if (_crawler != null)
+                    {
+                        _crawler.PageCrawlStarting -= Crawler_ProcessPageCrawlStarting;
+                        _crawler.PageCrawlCompleted -= Crawler_ProcessPageCrawlCompleted;
+                        _crawler.Dispose();
+                        _crawler = null;
+                    }
+                }
+            }
         }
     }
 }

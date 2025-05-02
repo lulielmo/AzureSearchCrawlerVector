@@ -91,3 +91,61 @@ The Abot crawler is configured by the method Crawler.CreateCrawlConfiguration, w
 - CrawlHandler is a simple interface decoupling crawling from processing each page.
 - AzureSearchIndexer is a CrawlHandler that indexes page content into AzureSearch.
 - Pages are modeled by the inner class AzureSearchIndexer.WebPage. The schema of your Azure Search index must match this class.
+
+# Azure Search Crawler
+
+## Integration Testing with Azure Services
+
+To run integration tests that interact with Azure services, you need to set up the following user-specific environment variables:
+
+### Required Environment Variables
+
+```powershell
+# Azure Search
+$env:AZURE_SEARCH_TEST_ENDPOINT="https://your-search-service.search.windows.net"
+$env:AZURE_SEARCH_TEST_KEY="your-search-service-admin-key"
+
+# Azure OpenAI
+$env:AZURE_OPENAI_TEST_ENDPOINT="https://your-openai-service.openai.azure.com"
+$env:AZURE_OPENAI_TEST_KEY="your-openai-service-key"
+$env:AZURE_OPENAI_TEST_DEPLOYMENT="your-embedding-deployment-name"
+$env:AZURE_OPENAI_EMBEDDING_DIMENSIONS="1536"  # or whatever dimension your embedding model uses
+```
+
+### Setting Up Variables
+
+1. **Temporary (Current Session)**
+   ```powershell
+   # Set variables for current PowerShell session
+   $env:AZURE_SEARCH_TEST_ENDPOINT="..."
+   $env:AZURE_OPENAI_EMBEDDING_DIMENSIONS="1536"  # or your model's dimension
+   ```
+
+2. **Permanent (User Level)**
+   ```powershell
+   # Set variables permanently for current user
+   [System.Environment]::SetEnvironmentVariable('AZURE_SEARCH_TEST_ENDPOINT', '...', [System.EnvironmentVariableTarget]::User)
+   [System.Environment]::SetEnvironmentVariable('AZURE_OPENAI_EMBEDDING_DIMENSIONS', '1536', [System.EnvironmentVariableTarget]::User)
+   ```
+
+3. **Using a Script**
+   Create a PowerShell script (e.g., `Set-TestEnvironment.ps1`):
+   ```powershell
+   # Set-TestEnvironment.ps1
+   $env:AZURE_SEARCH_TEST_ENDPOINT="..."
+   $env:AZURE_OPENAI_EMBEDDING_DIMENSIONS="1536"  # or your model's dimension
+   # ... other variables ...
+   ```
+
+### Important Notes
+
+- These variables are user-specific and should not be committed to source control
+- Each developer should use their own test Azure resources
+- The test index name is hardcoded to `integration-test-index`
+- Tests will clean up the index after running
+
+### Test Index Setup
+
+1. Create a new search index named `integration-test-index` in your Azure Search service
+2. Use the same schema as your production index
+3. The test will automatically clean up documents after running

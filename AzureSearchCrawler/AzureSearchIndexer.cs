@@ -41,6 +41,13 @@ namespace AzureSearchCrawler
 
         private readonly RateLimiter _rateLimiter;
 
+        private readonly SemaphoreSlim _searchClientLock = new(1, 1);
+        protected SearchClient? SearchClient
+        {
+            get => _searchClient;
+            set => _searchClient = value;
+        }
+
         public AzureSearchIndexer(
             string searchServiceEndpoint,
             string indexName,
@@ -83,30 +90,41 @@ namespace AzureSearchCrawler
             _dryRun = dryRun;
             _console = console ?? throw new ArgumentNullException(nameof(console));
 
-            _rateLimiter = new RateLimiter(TimeSpan.FromSeconds(4), enableRateLimiting);
+            _rateLimiter = new RateLimiter(TimeSpan.FromSeconds(4), enableRateLimiting, console);
 
-            if (!dryRun)
+            if (!dryRun && _searchClient == null)
             {
-                _searchClient = GetOrCreateSearchClient();
+                _searchClient = GetOrCreateSearchClient().Result;
                 _azureOpenAIClient = GetOrCreateAiClient();
                 _embeddingClient = GetOrCreateEmbeddingClient();
             }
         }
 
-        internal SearchClient GetOrCreateSearchClient()
+        internal async Task<SearchClient> GetOrCreateSearchClient()
         {
             if (_searchClient != null) return _searchClient;
             if (_dryRun) return null!;
 
-            _console.WriteLine("Initializing Azure Search client", LogLevel.Information);
-            _console.WriteLine($"Connecting to {_searchServiceEndpoint}, index: {_indexName}", LogLevel.Debug);
-            
-            var endpoint = new Uri(_searchServiceEndpoint);
-            var credential = new AzureKeyCredential(_adminApiKey);
-            _searchClient = new SearchClient(endpoint, _indexName, credential);
-            
-            _console.WriteLine("Azure Search client initialized successfully", LogLevel.Debug);
-            return _searchClient;
+            await _searchClientLock.WaitAsync();
+            try
+            {
+                // Double-check pattern
+                if (_searchClient != null) return _searchClient;
+
+                _console.WriteLine("Initializing Azure Search client", LogLevel.Information);
+                _console.WriteLine($"Connecting to {_searchServiceEndpoint}, index: {_indexName}", LogLevel.Debug);
+                
+                var endpoint = new Uri(_searchServiceEndpoint);
+                var credential = new AzureKeyCredential(_adminApiKey);
+                _searchClient = new SearchClient(endpoint, _indexName, credential);
+                
+                _console.WriteLine("Azure Search client initialized successfully", LogLevel.Debug);
+                return _searchClient;
+            }
+            finally
+            {
+                _searchClientLock.Release();
+            }
         }
 
         internal AzureOpenAIClient GetOrCreateAiClient()
@@ -154,11 +172,11 @@ namespace AzureSearchCrawler
                     return;
                 }
 
-                if (_rateLimiter != null)
+                /* if (_rateLimiter != null)
                 {
                     _console.WriteLine("Applying rate limiting before processing page", LogLevel.Verbose);
                     await _rateLimiter.WaitAsync();
-                }
+                } */
 
                 var metadata = ExtractPageContent(crawledPage);
                 if (metadata == null || string.IsNullOrEmpty(metadata["content"]))
@@ -176,37 +194,126 @@ namespace AzureSearchCrawler
                 string truncatedText = metadata["content"].Length > maxLength ? metadata["content"][..maxLength] : metadata["content"];
                 string truncatedTitle = metadata["title"].Length > maxLength ? metadata["title"][..maxLength] : metadata["title"];
 
+                _console.WriteLine($"Truncated content length: {truncatedText.Length} chars, Truncated title length: {truncatedTitle.Length} chars", LogLevel.Debug);
+
                 var startTime = DateTime.Now;
 
                 ArgumentNullException.ThrowIfNull(_embeddingClient); // Double-check to ensure client is available
 
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30)); // Timeout after 30 seconds
+
                 // Wait before first embedding call (for title)
-                if (_rateLimiter != null) await _rateLimiter.WaitAsync();
-                var titleEmbedding = await _embeddingClient.GenerateEmbeddingAsync(truncatedTitle, new EmbeddingGenerationOptions { Dimensions = _azureOpenAIEmbeddingDimensions });
-                _console.WriteLine($"Title embedding generated with {titleEmbedding.Value.ToFloats().Length} dimensions", LogLevel.Debug);
+                if (_rateLimiter != null && _rateLimiter.Enabled)
+                {
+                    var correlationId = Guid.NewGuid().ToString("N").Substring(0, 8);
+                    _console.WriteLine($"[{correlationId}] Starting rate limit wait for title embedding...", LogLevel.Debug);
+                    try
+                    {
+                        _console.WriteLine($"[{correlationId}] Before WaitAsync call", LogLevel.Debug);
+                        await _rateLimiter.WaitAsync(cts.Token);
+                        _console.WriteLine($"[{correlationId}] After WaitAsync call", LogLevel.Debug);
+                        _console.WriteLine($"[{correlationId}] Rate limit wait completed successfully", LogLevel.Debug);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _console.WriteLine($"[{correlationId}] Rate limit wait was cancelled", LogLevel.Warning);
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _console.WriteLine($"[{correlationId}] Rate limit wait failed: {ex.Message}", LogLevel.Error);
+                        _console.WriteLine($"[{correlationId}] Technical details: {ex}", LogLevel.Debug);
+                        throw;
+                    }
+                }
+
+                _console.WriteLine($"Generating title embedding for: {truncatedTitle}", LogLevel.Debug);
+                
+                ReadOnlyMemory<float> title_emb;
+                try
+                {
+                    // Double-check that the client is still valid
+                    if (_embeddingClient == null)
+                    {
+                        _console.WriteLine("Embedding client is null, recreating...", LogLevel.Warning);
+                        _embeddingClient = GetOrCreateEmbeddingClient();
+                    }
+
+                    _console.WriteLine($"About to call GenerateEmbeddingAsync with title length: {truncatedTitle.Length}", LogLevel.Debug);
+                    var titleEmbedding = await _embeddingClient.GenerateEmbeddingAsync(truncatedTitle, new EmbeddingGenerationOptions { Dimensions = _azureOpenAIEmbeddingDimensions });
+                    _console.WriteLine($"Title embedding generated with {titleEmbedding.Value.ToFloats().Length} dimensions", LogLevel.Debug);
+                    title_emb = titleEmbedding.Value.ToFloats().ToArray();
+                }
+                catch(Exception ex)
+                {
+                    _console.WriteLine($"Generating title embedding for: {truncatedTitle} failed: {ex.Message}", LogLevel.Error);
+                    _console.WriteLine($"Technical details: {ex}", LogLevel.Debug);
+                    throw;
+                }
 
                 // Wait before second embedding call (for content)
-                if (_rateLimiter != null) await _rateLimiter.WaitAsync();
-                var contentEmbedding = await _embeddingClient.GenerateEmbeddingAsync(truncatedText, new EmbeddingGenerationOptions { Dimensions = _azureOpenAIEmbeddingDimensions });
-                _console.WriteLine($"Content embedding generated with {contentEmbedding.Value.ToFloats().Length} dimensions", LogLevel.Debug);
-
-                var processingTime = DateTime.Now - startTime;
-                _console.WriteLine($"Embedding generation timing: {processingTime.TotalSeconds:F2} seconds", LogLevel.Verbose);
-
-                var webPage = new WebPage(
-                    crawledPage.Uri.ToString(),
-                    metadata["title"],
-                    metadata["content"],
-                    titleEmbedding.Value.ToFloats().ToArray(),
-                    contentEmbedding.Value.ToFloats().ToArray()
-                );
-
-                _queue.Add(webPage);
-                _console.WriteLine($"Added page to indexing queue (size: {_queue.Count}/{IndexingBatchSize})", LogLevel.Debug);
-
-                if (_queue.Count >= IndexingBatchSize)
+                if (_rateLimiter != null && _rateLimiter.Enabled)
                 {
-                    await IndexBatchIfNecessary();
+                    var correlationId = Guid.NewGuid().ToString("N").Substring(0, 8);
+                    _console.WriteLine($"[{correlationId}] Starting rate limit wait for content embedding...", LogLevel.Debug);
+                    try
+                    {
+                        _console.WriteLine($"[{correlationId}] Before WaitAsync call", LogLevel.Debug);
+                        await _rateLimiter.WaitAsync(cts.Token);
+                        _console.WriteLine($"[{correlationId}] After WaitAsync call", LogLevel.Debug);
+                        _console.WriteLine($"[{correlationId}] Rate limit wait completed successfully", LogLevel.Debug);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _console.WriteLine($"[{correlationId}] Rate limit wait was cancelled", LogLevel.Warning);
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _console.WriteLine($"[{correlationId}] Rate limit wait failed: {ex.Message}", LogLevel.Error);
+                        _console.WriteLine($"[{correlationId}] Technical details: {ex}", LogLevel.Debug);
+                        throw;
+                    }
+                }
+
+                _console.WriteLine($"About to generate content embedding for text of length: {truncatedText.Length}", LogLevel.Debug);
+                try
+                {
+                    // Double-check that the client is still valid
+                    if (_embeddingClient == null)
+                    {
+                        _console.WriteLine("Embedding client is null, recreating...", LogLevel.Warning);
+                        _embeddingClient = GetOrCreateEmbeddingClient();
+                    }
+
+                    _console.WriteLine($"Creating embedding options with dimensions: {_azureOpenAIEmbeddingDimensions}", LogLevel.Debug);
+                    var options = new EmbeddingGenerationOptions { Dimensions = _azureOpenAIEmbeddingDimensions };
+                    _console.WriteLine($"Calling GenerateEmbeddingAsync with text length: {truncatedText.Length}", LogLevel.Debug);
+                    var contentEmbedding = await _embeddingClient.GenerateEmbeddingAsync(truncatedText, options);
+                    _console.WriteLine($"Content embedding generated with {contentEmbedding.Value.ToFloats().Length} dimensions", LogLevel.Debug);
+
+                    var webPage = new WebPage(
+                        crawledPage.Uri.ToString(),
+                        metadata["title"],
+                        metadata["content"],
+                        title_emb,
+                        contentEmbedding.Value.ToFloats().ToArray()
+                    );
+
+                    _console.WriteLine($"Adding page to queue: {webPage.Url}", LogLevel.Debug);
+                    _queue.Add(webPage);
+                    _console.WriteLine($"Queue size after adding: {_queue.Count}", LogLevel.Debug);
+
+                    if (_queue.Count >= IndexingBatchSize)
+                    {
+                        await IndexBatchIfNecessary();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _console.WriteLine($"Failed to generate content embedding: {ex.Message}", LogLevel.Error);
+                    _console.WriteLine($"Technical details: {ex}", LogLevel.Debug);
+                    throw;
                 }
             }
             catch (Exception ex)
@@ -250,6 +357,7 @@ namespace AzureSearchCrawler
             {
                 if (_queue.Count == 0 || _searchClient == null)
                 {
+                    _console.WriteLine($"No documents to index - Queue size: {_queue.Count}, Search client: {(_searchClient == null ? "null" : "not null")}", LogLevel.Debug);
                     return await Task.FromResult<IndexDocumentsResult>(null!);
                 }
 
@@ -258,6 +366,7 @@ namespace AzureSearchCrawler
                 {
                     if (_queue.TryTake(out var page))
                     {
+                        _console.WriteLine($"Adding page to batch: {page.Url}", LogLevel.Debug);
                         batch.Add(page);
                     }
                 }
@@ -313,7 +422,12 @@ namespace AzureSearchCrawler
                     return;
                 }
 
-                var searchClient = GetOrCreateSearchClient();
+                if (_searchClient == null)
+                {
+                    _console.WriteLine("Search client is not initialized", LogLevel.Error);
+                    return;
+                }
+
                 _console.WriteLine($"Indexing single page: {url}", LogLevel.Information);
                 _console.WriteLine($"Content size: {content["content"].Length} bytes, Title length: {content["title"].Length} chars", LogLevel.Debug);
 
@@ -327,7 +441,7 @@ namespace AzureSearchCrawler
                     }));
 
                 var startTime = DateTime.Now;
-                await searchClient.IndexDocumentsAsync(batch);
+                await _searchClient.IndexDocumentsAsync(batch);
                 var processingTime = DateTime.Now - startTime;
                 
                 _console.WriteLine($"Page indexed successfully", LogLevel.Information);
