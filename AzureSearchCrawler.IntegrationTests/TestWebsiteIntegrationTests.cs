@@ -121,9 +121,9 @@ namespace AzureSearchCrawler.IntegrationTests
                     Console.WriteLine($"Creating crawler with mode: {mode}");
                     return mode switch
                     {
-                        CrawlMode.Sitemap => new SitemapCrawler(indexer, console),
+                        CrawlMode.Sitemap => new SitemapCrawler(queue, console),
                         CrawlMode.Standard => new AbotCrawler(queue, console),
-                        CrawlMode.Headless => new HeadlessBrowserCrawler(indexer, console),
+                        CrawlMode.Headless => new HeadlessBrowserCrawler(queue, console),
                         _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", nameof(mode))
                     };
                 });
@@ -252,9 +252,9 @@ namespace AzureSearchCrawler.IntegrationTests
                     Console.WriteLine($"Creating crawler with mode: {mode}");
                     return mode switch
                     {
-                        CrawlMode.Sitemap => new SitemapCrawler(indexer, console),
+                        CrawlMode.Sitemap => new SitemapCrawler(queue, console),
                         CrawlMode.Standard => new AbotCrawler(queue, console),
-                        CrawlMode.Headless => new HeadlessBrowserCrawler(indexer, console),
+                        CrawlMode.Headless => new HeadlessBrowserCrawler(queue, console),
                         _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", nameof(mode))
                     };
                 });
@@ -345,9 +345,9 @@ namespace AzureSearchCrawler.IntegrationTests
                     Console.WriteLine($"Creating crawler with mode: {mode}");
                     return mode switch
                     {
-                        CrawlMode.Sitemap => new SitemapCrawler(indexer, console),
+                        CrawlMode.Sitemap => new SitemapCrawler(queue, console),
                         CrawlMode.Standard => new AbotCrawler(queue, console),
-                        CrawlMode.Headless => new HeadlessBrowserCrawler(indexer, console),
+                        CrawlMode.Headless => new HeadlessBrowserCrawler(queue, console),
                         _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", nameof(mode))
                     };
                 });
@@ -434,9 +434,9 @@ namespace AzureSearchCrawler.IntegrationTests
                     Console.WriteLine($"Creating crawler with mode: {mode}");
                     return mode switch
                     {
-                        CrawlMode.Sitemap => new SitemapCrawler(indexer, console),
+                        CrawlMode.Sitemap => new SitemapCrawler(queue, console),
                         CrawlMode.Standard => new AbotCrawler(queue, console),
-                        CrawlMode.Headless => new HeadlessBrowserCrawler(indexer, console),
+                        CrawlMode.Headless => new HeadlessBrowserCrawler(queue, console),
                         _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", nameof(mode))
                     };
                 });
@@ -535,9 +535,9 @@ namespace AzureSearchCrawler.IntegrationTests
                         Console.WriteLine($"Creating crawler with mode: {mode}");
                         return mode switch
                         {
-                            CrawlMode.Sitemap => new SitemapCrawler(indexer, console),
+                            CrawlMode.Sitemap => new SitemapCrawler(queue, console),
                             CrawlMode.Standard => new AbotCrawler(queue, console),
-                            CrawlMode.Headless => new HeadlessBrowserCrawler(indexer, console),
+                            CrawlMode.Headless => new HeadlessBrowserCrawler(queue, console),
                             _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", nameof(mode))
                         };
                     });

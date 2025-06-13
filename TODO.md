@@ -24,8 +24,8 @@
       - [x] Implement CrawledPageQueue for thread-safe data handling
       - [x] Create VectorizedPageProcessor for embedding and indexing
       - [x] Update AbotCrawler to use new queue-based approach
-      - [ ] Update SitemapCrawler to use new queue-based approach
-      - [ ] Update HeadlessBrowserCrawler to use new queue-based approach
+      - [x] Update SitemapCrawler to use new queue-based approach
+      - [x] Update HeadlessBrowserCrawler to use new queue-based approach
       - [ ] Implement batch processing for embeddings
       - [ ] Add rate limiting for embedding API calls
       - [ ] Create integration tests for new components

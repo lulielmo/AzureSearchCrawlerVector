@@ -9,13 +9,14 @@ using Azure.Search.Documents.Models;
 using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
 using OpenAI.Embeddings;
+using Abot2.Poco;
 
 namespace AzureSearchCrawler
 {
     /// <summary>
     /// Processes crawled pages by generating embeddings and indexing them.
     /// </summary>
-    public class VectorizedPageProcessor
+    public class VectorizedPageProcessor : ICrawledPageProcessor
     {
         private readonly string _searchServiceEndpoint;
         private readonly string _indexName;
@@ -56,6 +57,40 @@ namespace AzureSearchCrawler
             _azureOpenAIEmbeddingDimensions = azureOpenAIEmbeddingDimensions;
             _console = console ?? throw new ArgumentNullException(nameof(console));
             _queue = queue ?? throw new ArgumentNullException(nameof(queue));
+        }
+
+        /// <summary>
+        /// Processes a single crawled page.
+        /// </summary>
+        public async Task PageCrawledAsync(CrawledPage page)
+        {
+            ArgumentNullException.ThrowIfNull(page);
+            ArgumentNullException.ThrowIfNull(page.Uri);
+
+            try
+            {
+                var crawledWebPage = new CrawledWebPage(
+                    page.Uri,
+                    page.AngleSharpHtmlDocument?.QuerySelector("title")?.TextContent ?? string.Empty,
+                    page.AngleSharpHtmlDocument?.Body?.TextContent ?? string.Empty,
+                    (int)page.HttpResponseMessage.StatusCode,
+                    null);
+
+                _queue.Enqueue(crawledWebPage);
+            }
+            catch (Exception ex)
+            {
+                _console.WriteLine($"Error processing page {page.Uri}: {ex.Message}", LogLevel.Error);
+                _console.WriteLine($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
+            }
+        }
+
+        /// <summary>
+        /// Called when the crawling process is complete.
+        /// </summary>
+        public async Task CrawlFinishedAsync()
+        {
+            _queue.MarkAsComplete();
         }
 
         /// <summary>
@@ -162,6 +197,12 @@ namespace AzureSearchCrawler
 
         private async Task<float[]> GenerateEmbeddingAsync(string text, CancellationToken cancellationToken)
         {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                _console.WriteLine("Skipping empty text for embedding generation", LogLevel.Warning);
+                return new float[_azureOpenAIEmbeddingDimensions];
+            }
+
             await Task.Delay(_rateLimitDelay, cancellationToken);
 
             var options = new EmbeddingGenerationOptions { Dimensions = _azureOpenAIEmbeddingDimensions };

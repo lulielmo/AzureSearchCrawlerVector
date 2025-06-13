@@ -49,25 +49,28 @@ namespace AzureSearchCrawler
 
             IWebCrawlingStrategy crawler = mode switch
             {
-                CrawlMode.Sitemap => new SitemapCrawler(indexer, console),
                 CrawlMode.Standard => new AbotCrawler(queue, console),
-                CrawlMode.Headless => new HeadlessBrowserCrawler(indexer, console),
-                _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", nameof(mode))
+                CrawlMode.Sitemap => new SitemapCrawler(queue, console),
+                CrawlMode.Headless => new HeadlessBrowserCrawler(queue, console),
+                _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", "mode")
             };
 
-            // Starta processor i bakgrunden
-            _ = Task.Run(async () =>
+            // Starta processor i bakgrunden om det inte är dry run
+            if (!indexer.DryRun)
             {
-                try
+                _ = Task.Run(async () =>
                 {
-                    await processor.ProcessQueueAsync();
-                }
-                catch (Exception ex)
-                {
-                    console.WriteLine($"Error in processor: {ex.Message}", LogLevel.Error);
-                    console.WriteLine($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
-                }
-            });
+                    try
+                    {
+                        await processor.ProcessQueueAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        console.WriteLine($"Error in processor: {ex.Message}", LogLevel.Error);
+                        console.WriteLine($"Technical details: {ex}", LogLevel.Debug);
+                    }
+                });
+            }
 
             return crawler;
         }

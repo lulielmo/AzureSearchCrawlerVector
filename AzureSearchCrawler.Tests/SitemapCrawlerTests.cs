@@ -13,17 +13,17 @@ namespace AzureSearchCrawler.Tests
     /// </summary>
     public class SitemapCrawlerTests
     {
-        private readonly Mock<ICrawledPageProcessor> _handlerMock;
         private readonly Mock<IConsole> _consoleMock;
         private readonly Mock<HttpMessageHandler> _httpHandlerMock;
         private readonly HttpClient _httpClient;
+        private readonly CrawledPageQueue _queue;
 
         public SitemapCrawlerTests()
         {
-            _handlerMock = new Mock<ICrawledPageProcessor>();
             _consoleMock = new Mock<IConsole>();
             _httpHandlerMock = new Mock<HttpMessageHandler>();
             _httpClient = new HttpClient(_httpHandlerMock.Object);
+            _queue = new CrawledPageQueue();
         }
 
         #region Basic Sitemap Handling
@@ -77,7 +77,7 @@ namespace AzureSearchCrawler.Tests
             _consoleMock.Setup(c => c.WriteLine(It.IsAny<string>(), It.IsAny<LogLevel>()))
                 .Callback<string, LogLevel>((message, level) => loggedMessages.Add((message, level)));
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
+            var crawler = new SitemapCrawler(_queue, _consoleMock.Object, _httpClient);
 
             // Act
             await crawler.CrawlAsync(new Uri("http://example.com"), 10, 1);
@@ -85,7 +85,11 @@ namespace AzureSearchCrawler.Tests
             // Assert
             Assert.Contains(loggedMessages, m => m.Message.Contains("Found sitemap URL in robots.txt:") && m.Level == LogLevel.Information);
 
-            _handlerMock.Verify(h => h.PageCrawledAsync(It.IsAny<CrawledPage>()), Times.Once);
+            Assert.True(_queue.TryDequeue(out var dequeuedPage), "No page was added to the queue");
+            Assert.NotNull(dequeuedPage);
+            Assert.Equal(new Uri("http://example.com/page1"), dequeuedPage.Uri);
+            Assert.Equal(pageContent, dequeuedPage.Content);
+            Assert.Equal((int)HttpStatusCode.OK, dequeuedPage.StatusCode);
         }
 
         /// <summary>
@@ -134,17 +138,21 @@ namespace AzureSearchCrawler.Tests
                     return response;
                 });
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
+            var crawler = new SitemapCrawler(_queue, _consoleMock.Object, _httpClient);
 
             // Act
             await crawler.CrawlAsync(new Uri("http://example.com"), 10, 1);
 
             // Assert
-            _handlerMock.Verify(h => h.PageCrawledAsync(It.Is<CrawledPage>(p => 
-                p.Uri.ToString() == "http://example.com/page1")), Times.Once);
-            _handlerMock.Verify(h => h.PageCrawledAsync(It.Is<CrawledPage>(p => 
-                p.Uri.ToString() == "http://example.com/page2")), Times.Once);
-            _handlerMock.Verify(h => h.PageCrawledAsync(It.IsAny<CrawledPage>()), Times.Exactly(2));
+            var pages = new List<CrawledWebPage>();
+            while (_queue.TryDequeue(out var page))
+            {
+                pages.Add(page);
+            }
+
+            Assert.Equal(2, pages.Count);
+            Assert.Contains(pages, p => p.Uri.ToString() == "http://example.com/page1" && p.Content == page1Content);
+            Assert.Contains(pages, p => p.Uri.ToString() == "http://example.com/page2" && p.Content == page2Content);
         }
         #endregion
 
@@ -183,13 +191,19 @@ namespace AzureSearchCrawler.Tests
                     return response;
                 });
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
+            var crawler = new SitemapCrawler(_queue, _consoleMock.Object, _httpClient);
 
             // Act
             await crawler.CrawlAsync(new Uri("http://example.com"), maxPages: 2, maxDepth: 1);
 
             // Assert
-            _handlerMock.Verify(h => h.PageCrawledAsync(It.IsAny<CrawledPage>()), Times.Exactly(2));
+            var pages = new List<CrawledWebPage>();
+            while (_queue.TryDequeue(out var page))
+            {
+                pages.Add(page);
+            }
+
+            Assert.Equal(2, pages.Count);
         }
 
         /// <summary>
@@ -230,16 +244,20 @@ namespace AzureSearchCrawler.Tests
                     return response;
                 });
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
+            var crawler = new SitemapCrawler(_queue, _consoleMock.Object, _httpClient);
 
             // Act
             await crawler.CrawlAsync(new Uri("http://example.com"), 10, 1);
 
             // Assert
-            _handlerMock.Verify(h => h.PageCrawledAsync(
-                It.Is<CrawledPage>(p => p.Uri.ToString() == "http://example.com/valid-page")), 
-                Times.Once);
-            _handlerMock.Verify(h => h.PageCrawledAsync(It.IsAny<CrawledPage>()), Times.Once);
+            var pages = new List<CrawledWebPage>();
+            while (_queue.TryDequeue(out var page))
+            {
+                pages.Add(page);
+            }
+
+            Assert.Single(pages);
+            Assert.Equal(new Uri("http://example.com/valid-page"), pages[0].Uri);
             
             // Verify logging of skipped URLs
             _consoleMock.Verify(c => c.WriteLine(
@@ -304,14 +322,20 @@ namespace AzureSearchCrawler.Tests
                     return response;
                 });
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
+            var crawler = new SitemapCrawler(_queue, _consoleMock.Object, _httpClient);
 
             // Act
             await crawler.CrawlAsync(new Uri("http://example.com"), 10, 1);
 
             // Assert
-            _handlerMock.Verify(h => h.PageCrawledAsync(It.Is<CrawledPage>(p => 
-                p.Uri.ToString() == "http://example.com/final-page")), Times.Once);
+            var pages = new List<CrawledWebPage>();
+            while (_queue.TryDequeue(out var page))
+            {
+                pages.Add(page);
+            }
+
+            Assert.Single(pages);
+            Assert.Equal(new Uri("http://example.com/final-page"), pages[0].Uri);
         }
 
         /// <summary>
@@ -380,16 +404,21 @@ namespace AzureSearchCrawler.Tests
             _consoleMock.Setup(c => c.WriteLine(It.IsAny<string>(), It.IsAny<LogLevel>()))
                 .Callback<string, LogLevel>((message, level) => loggedMessages.Add((message, level)));
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
+            var crawler = new SitemapCrawler(_queue, _consoleMock.Object, _httpClient);
 
             // Act
             await crawler.CrawlAsync(new Uri("http://example.com"), 10, 1);
 
             // Assert
-            _handlerMock.Verify(h => h.PageCrawledAsync(It.Is<CrawledPage>(p => 
-                p.Uri.ToString() == "http://example.com/page1")), Times.Once);
-            _handlerMock.Verify(h => h.PageCrawledAsync(It.Is<CrawledPage>(p => 
-                p.Uri.ToString() == "http://example.com/page2")), Times.Once);
+            var pages = new List<CrawledWebPage>();
+            while (_queue.TryDequeue(out var page))
+            {
+                pages.Add(page);
+            }
+
+            Assert.Equal(2, pages.Count);
+            Assert.Contains(pages, p => p.Uri.ToString() == "http://example.com/page1");
+            Assert.Contains(pages, p => p.Uri.ToString() == "http://example.com/page2");
             Assert.Contains(loggedMessages, m => m.Message.Contains("Skipping sitemap: circular reference detected at") && m.Level == LogLevel.Warning);
         }
 
@@ -423,7 +452,7 @@ namespace AzureSearchCrawler.Tests
                     return response;
                 });
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
+            var crawler = new SitemapCrawler(_queue, _consoleMock.Object, _httpClient);
 
             // Act
             await crawler.CrawlAsync(new Uri("http://example.com"), 10, 1);
@@ -476,7 +505,7 @@ namespace AzureSearchCrawler.Tests
             _consoleMock.Setup(c => c.WriteLine(It.IsAny<string>(), It.IsAny<LogLevel>()))
                 .Callback<string, LogLevel>((message, level) => loggedMessages.Add((message, level)));
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
+            var crawler = new SitemapCrawler(_queue, _consoleMock.Object, _httpClient);
 
             // Act
             await Assert.ThrowsAsync<Exception>(async () => 
@@ -525,7 +554,7 @@ namespace AzureSearchCrawler.Tests
             _consoleMock.Setup(c => c.WriteLine(It.IsAny<string>(), It.IsAny<LogLevel>()))
                 .Callback<string, LogLevel>((message, level) => loggedMessages.Add((message, level)));
 
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object, _httpClient);
+            var crawler = new SitemapCrawler(_queue, _consoleMock.Object, _httpClient);
 
             // Act
             await crawler.CrawlAsync(new Uri("http://example.com"), 10, 1);
@@ -541,11 +570,7 @@ namespace AzureSearchCrawler.Tests
         public void Constructor_WithNullHttpClient_SetsUserAgent()
         {
             // Act
-            var crawler = new SitemapCrawler(_handlerMock.Object, _consoleMock.Object);
-
-            // Assert - Vi kan inte direkt testa _httpClient eftersom det är privat,
-            // men vi kan verifiera att den fungerar genom att göra ett anrop
-            Assert.NotNull(crawler);
+            var crawler = new SitemapCrawler(_queue, _consoleMock.Object);
         }
         #endregion
     }

@@ -55,6 +55,7 @@ namespace AzureSearchCrawler
         public string EmbeddingKey => _embeddingAiAdminApiKey;
         public string EmbeddingDeployment => _embeddingDeployment;
         public int EmbeddingDimensions => _azureOpenAIEmbeddingDimensions;
+        public bool DryRun => _dryRun;
 
         public AzureSearchIndexer(
             string searchServiceEndpoint,

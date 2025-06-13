@@ -3,12 +3,13 @@ using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
 using System.Xml;
 using System.Xml.Linq;
+using System.Net;
 
 namespace AzureSearchCrawler
 {
     public class SitemapCrawler : IWebCrawlingStrategy
     {
-        private readonly ICrawledPageProcessor _processor;
+        private readonly CrawledPageQueue _queue;
         private readonly IConsole _console;
         private readonly HttpClient _httpClient;
         private int _processedPages;
@@ -23,9 +24,9 @@ namespace AzureSearchCrawler
             "/robots.txt"  // Check robots.txt first to find sitemap URL
         ];
 
-        public SitemapCrawler(ICrawledPageProcessor processor, IConsole console, HttpClient? httpClient = null)
+        public SitemapCrawler(CrawledPageQueue queue, IConsole console, HttpClient? httpClient = null)
         {
-            _processor = processor ?? throw new ArgumentNullException(nameof(processor));
+            _queue = queue ?? throw new ArgumentNullException(nameof(queue));
             _console = console ?? throw new ArgumentNullException(nameof(console));
             _httpClient = httpClient ?? new HttpClient();
             _processedSitemaps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -129,6 +130,7 @@ namespace AzureSearchCrawler
             var ns = doc.Root?.GetDefaultNamespace() ?? XNamespace.None;
             var urls = doc.Descendants(ns + "url").ToList();
             _console.WriteLine($"Found {urls.Count} URLs in sitemap", LogLevel.Information);
+            _console.WriteLine($"Current namespace: {ns}", LogLevel.Debug);
 
             foreach (var urlElement in urls)
             {
@@ -173,11 +175,20 @@ namespace AzureSearchCrawler
                     _console.WriteLine($"Download timing: {loadTime.TotalSeconds:F2} seconds", LogLevel.Verbose);
                     _console.WriteLine($"Request details - URL: {pageUri}, Content type: {pageContent.Length}", LogLevel.Verbose);
 
-                    var crawledPage = new CrawledPage(pageUri)
+                    if (string.IsNullOrWhiteSpace(pageContent))
                     {
-                        Content = new PageContent { Text = pageContent }
-                    };
-                    await _processor.PageCrawledAsync(crawledPage);
+                        _console.WriteLine($"Skipping empty page content: {pageUri}", LogLevel.Warning);
+                        continue;
+                    }
+
+                    var page = new CrawledWebPage(
+                        pageUri,
+                        "", // Title will be extracted by the processor
+                        pageContent,
+                        (int)HttpStatusCode.OK,
+                        null);
+
+                    _queue.Enqueue(page);
                     _processedPages++;
                 }
                 catch (Exception ex)
@@ -256,7 +267,7 @@ namespace AzureSearchCrawler
                             continue;
                         }
 
-                        await _processor.CrawlFinishedAsync();
+                        _queue.MarkAsComplete();
                         _console.WriteLine($"Crawl completed successfully. Processed {_processedPages} pages.", LogLevel.Information);
                         return;
                     }
@@ -277,7 +288,7 @@ namespace AzureSearchCrawler
             }
             catch (Exception ex)
             {
-                _console.WriteLine($"Critical error during crawl: {ex.Message}", LogLevel.Error);
+                _console.WriteLine($"Crawl failed: {ex.Message}", LogLevel.Error);
                 _console.WriteLine($"Technical details: {ex}", LogLevel.Debug);
                 throw;
             }
