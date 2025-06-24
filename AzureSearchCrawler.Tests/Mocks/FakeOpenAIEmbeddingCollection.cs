@@ -1,14 +1,10 @@
-﻿using System;
+﻿using Moq;
 using OpenAI.Embeddings;
-using System.Collections.ObjectModel;
-using System.Collections.Generic;
-using System.Linq;
-using System.Collections;
-using System.Runtime.CompilerServices;
-using System.Reflection;
 using System.ClientModel;
-using Moq;
 using System.ClientModel.Primitives;
+using System.Collections.ObjectModel;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace AzureSearchCrawler.Tests.Mocks
 {
@@ -21,7 +17,7 @@ namespace AzureSearchCrawler.Tests.Mocks
 
         public FakeOpenAIEmbeddingCollection(IList<OpenAIEmbedding> embeddings) : base(embeddings)
         {
-            _realCollection = RuntimeHelpers.GetUninitializedObject(typeof(OpenAIEmbeddingCollection)) as OpenAIEmbeddingCollection;
+            _realCollection = RuntimeHelpers.GetUninitializedObject(typeof(OpenAIEmbeddingCollection)) as OpenAIEmbeddingCollection ?? throw new InvalidOperationException("Failed to create OpenAIEmbeddingCollection instance");
             var field = typeof(OpenAIEmbeddingCollection).GetField("_embeddings", BindingFlags.NonPublic | BindingFlags.Instance);
             field!.SetValue(_realCollection, embeddings);
         }

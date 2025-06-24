@@ -71,7 +71,7 @@ namespace AzureSearchCrawler
         /// <summary>
         /// Processes a single crawled page.
         /// </summary>
-        public async Task PageCrawledAsync(CrawledWebPage page)
+        public Task PageCrawledAsync(CrawledWebPage page)
         {
             ArgumentNullException.ThrowIfNull(page);
             ArgumentNullException.ThrowIfNull(page.Uri);
@@ -85,14 +85,17 @@ namespace AzureSearchCrawler
                 _console.WriteLine($"Error processing page {page.Uri}: {ex.Message}", LogLevel.Error);
                 _console.WriteLine($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
             }
+
+            return Task.CompletedTask;
         }
 
         /// <summary>
         /// Called when the crawling process is complete.
         /// </summary>
-        public async Task CrawlFinishedAsync()
+        public  Task CrawlFinishedAsync()
         {
             _queue.MarkAsComplete();
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -111,7 +114,7 @@ namespace AzureSearchCrawler
                 var batch = new List<CrawledWebPage>();
                 while (!_queue.IsEmptyAndComplete && !cancellationToken.IsCancellationRequested)
                 {
-                    if (_queue.TryDequeue(out var page))
+                    if (_queue.TryDequeue(out var page) && page != null)
                     {
                         batch.Add(page);
 
@@ -143,7 +146,7 @@ namespace AzureSearchCrawler
             }
         }
 
-        private async Task InitializeClientsAsync()
+        private  Task InitializeClientsAsync()
         {
             if (_searchClient == null)
             {
@@ -164,6 +167,7 @@ namespace AzureSearchCrawler
                     new Azure.AzureKeyCredential(_adminApiKey),
                     searchClientOptions);
             }
+            return Task.CompletedTask;
         }
 
         private async Task ProcessBatchAsync(List<CrawledWebPage> batch, CancellationToken cancellationToken)

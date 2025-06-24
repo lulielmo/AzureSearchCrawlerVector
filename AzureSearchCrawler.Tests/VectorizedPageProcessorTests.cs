@@ -1,19 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Azure.AI.OpenAI;
-using Azure.Search.Documents;
-using Azure.Search.Documents.Models;
 using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
 using AzureSearchCrawler.Tests.Mocks;
-using AzureSearchCrawler.Tests.Models;
 using AzureSearchCrawler.Utils;
 using Moq;
 using Xunit;
-using LogLevel = AzureSearchCrawler.Models.LogLevel;
 
 namespace AzureSearchCrawler.Tests;
 
@@ -21,7 +11,6 @@ namespace AzureSearchCrawler.Tests;
 public class VectorizedPageProcessorTests
 {
     private readonly Mock<IConsole> _consoleMock;
-    private readonly Mock<AzureOpenAIClient> _azureOpenAIClientMock;
     private readonly MockEmbeddingClient _embeddingClient;
     private readonly MockSearchClient _searchClient;
     private readonly VectorizedPageProcessor _processor;

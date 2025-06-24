@@ -36,7 +36,7 @@ namespace AzureSearchCrawler
         /// </summary>
         /// <param name="page">When this method returns, if the operation was successful, contains the object removed.</param>
         /// <returns>true if an element was removed and returned from the beginning of the queue successfully; otherwise, false.</returns>
-        public bool TryDequeue(out CrawledWebPage page)
+        public bool TryDequeue(out CrawledWebPage? page)
         {
             return _queue.TryDequeue(out page);
         }

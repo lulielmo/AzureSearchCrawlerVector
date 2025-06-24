@@ -264,8 +264,12 @@ namespace AzureSearchCrawler
                     var queue = new CrawledPageQueue();
                     
                     var (processor, processorTask) = _processorFactory(
-                        serviceEndPoint, adminApiKey, indexName, 
-                        embeddingEndPoint, embeddingAdminKey, embeddingDeploymentName, 
+                        serviceEndPoint, 
+                        adminApiKey ?? throw new ArgumentException("Admin API key is required"),
+                        indexName ?? throw new ArgumentException("Index name is required"),
+                        embeddingEndPoint, 
+                        embeddingAdminKey ?? throw new ArgumentException("Embedding admin key is required"),
+                        embeddingDeploymentName  ?? throw new ArgumentException("Embedding deployment name is required"),
                         azureOpenAIEmbeddingDimensions, console, queue);
 
                     if (dryRun)
