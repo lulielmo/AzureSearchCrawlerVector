@@ -1,18 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using Azure;
 using Azure.AI.OpenAI;
 using Azure.Search.Documents;
 using Azure.Search.Documents.Models;
+using AzureSearchCrawler.Adapters;
 using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
-using AzureSearchCrawler.Adapters;
 using AzureSearchCrawler.Utils;
-using OpenAI.Embeddings;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace AzureSearchCrawler
 {
@@ -33,7 +25,8 @@ namespace AzureSearchCrawler
         private readonly IConsole _console;
         private readonly CrawledPageQueue _queue;
         private readonly int _batchSize = 10;
-        private readonly TimeSpan _rateLimitDelay = TimeSpan.FromSeconds(4);
+        private readonly TimeSpan _rateLimitDelay;
+        private readonly bool _dryRun;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="VectorizedPageProcessor"/> class.
@@ -48,6 +41,8 @@ namespace AzureSearchCrawler
             int azureOpenAIEmbeddingDimensions,
             IConsole console,
             CrawledPageQueue queue,
+            bool dryRun = false,
+            TimeSpan? rateLimitDelay = null,
             IEmbeddingClient? embeddingClient = null,
             SearchClient? searchClient = null)
         {
@@ -60,6 +55,8 @@ namespace AzureSearchCrawler
             _azureOpenAIEmbeddingDimensions = azureOpenAIEmbeddingDimensions;
             _console = console ?? throw new ArgumentNullException(nameof(console));
             _queue = queue ?? throw new ArgumentNullException(nameof(queue));
+            _dryRun = dryRun;
+            _rateLimitDelay = rateLimitDelay ?? TimeSpan.FromSeconds(4);
             _embeddingClient = embeddingClient ?? new OpenAIEmbeddingClientAdapter(
                 new AzureOpenAIClient(
                     new Uri(_embeddingAiEndpoint),
@@ -92,24 +89,34 @@ namespace AzureSearchCrawler
         /// <summary>
         /// Called when the crawling process is complete.
         /// </summary>
-        public  Task CrawlFinishedAsync()
+        public Task CrawlFinishedAsync()
         {
             _queue.MarkAsComplete();
             return Task.CompletedTask;
         }
 
         /// <summary>
-        /// Starts processing the queue of crawled pages.
+        /// Processes the queue of crawled pages asynchronously.
         /// </summary>
-        /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+        /// <param name="cancellationToken">A cancellation token.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         public async Task ProcessQueueAsync(CancellationToken cancellationToken = default)
         {
-            _console.WriteLine("Starting to process crawled pages...", LogLevel.Information);
+            if (_dryRun)
+            {
+                _console.WriteLine("Starting to process crawled pages in DRY RUN mode...", LogLevel.Information);
+            }
+            else
+            {
+                _console.WriteLine("Starting to process crawled pages...", LogLevel.Information);
+            }
 
             try
             {
-                await InitializeClientsAsync();
+                if (!_dryRun)
+                {
+                    await InitializeClientsAsync();
+                }
 
                 var batch = new List<CrawledWebPage>();
                 while (!_queue.IsEmptyAndComplete && !cancellationToken.IsCancellationRequested)
@@ -136,7 +143,14 @@ namespace AzureSearchCrawler
                     await ProcessBatchAsync(batch, cancellationToken);
                 }
 
-                _console.WriteLine("Finished processing crawled pages.", LogLevel.Information);
+                if (_dryRun)
+                {
+                    _console.WriteLine("Finished processing crawled pages in DRY RUN mode.", LogLevel.Information);
+                }
+                else
+                {
+                    _console.WriteLine("Finished processing crawled pages.", LogLevel.Information);
+                }
             }
             catch (Exception ex)
             {
@@ -146,7 +160,7 @@ namespace AzureSearchCrawler
             }
         }
 
-        private  Task InitializeClientsAsync()
+        private Task InitializeClientsAsync()
         {
             if (_searchClient == null)
             {
@@ -172,6 +186,16 @@ namespace AzureSearchCrawler
 
         private async Task ProcessBatchAsync(List<CrawledWebPage> batch, CancellationToken cancellationToken)
         {
+            if (_dryRun)
+            {
+                _console.WriteLine($"[DRY RUN] Would process batch of {batch.Count} pages...", LogLevel.Information);
+                foreach (var page in batch)
+                {
+                    _console.WriteLine($"[DRY RUN] Would index page: {page.Uri}", LogLevel.Information);
+                }
+                return;
+            }
+
             _console.WriteLine($"Processing batch of {batch.Count} pages...", LogLevel.Information);
 
             try
@@ -204,8 +228,22 @@ namespace AzureSearchCrawler
                             _console.WriteLine($"Warning: Empty content found for {page.Uri}, this should have been filtered out earlier", LogLevel.Warning);
                         }
 
-                        texts.Add(title);
-                        texts.Add(page.Content);
+                        // Truncate text to max 8000 characters to be safe (well below 8192 token limit)
+                        const int maxLength = 8000;
+                        var truncatedContent = page.Content.Length > maxLength ? page.Content[..maxLength] : page.Content;
+                        var truncatedTitle = title.Length > maxLength ? title[..maxLength] : title;
+
+                        if (page.Content.Length > maxLength)
+                        {
+                            _console.WriteLine($"Truncated content for {page.Uri}: {page.Content.Length} -> {truncatedContent.Length} chars", LogLevel.Debug);
+                        }
+                        if (title.Length > maxLength)
+                        {
+                            _console.WriteLine($"Truncated title for {page.Uri}: {title.Length} -> {truncatedTitle.Length} chars", LogLevel.Debug);
+                        }
+
+                        texts.Add(truncatedTitle);
+                        texts.Add(truncatedContent);
                         pageIndices.Add(pageGroup.IndexOf(page));
                     }
 
@@ -222,12 +260,18 @@ namespace AzureSearchCrawler
                         var titleEmbedding = embeddings[i * 2];
                         var contentEmbedding = embeddings[i * 2 + 1];
 
+                        // Använd samma trunkering som för embedding
+                        const int maxLength = 8000;
+                        var title = string.IsNullOrWhiteSpace(page.Title) ? "-" : page.Title;
+                        var truncatedContent = page.Content.Length > maxLength ? page.Content[..maxLength] : page.Content;
+                        var truncatedTitle = title.Length > maxLength ? title[..maxLength] : title;
+
                         var document = new SearchDocument
                         {
                             ["id"] = HashUtils.CreateSHA512(page.Uri.ToString()),
                             ["url"] = page.Uri.ToString(),
-                            ["title"] = string.IsNullOrWhiteSpace(page.Title) ? "-" : page.Title,
-                            ["content"] = page.Content,
+                            ["title"] = truncatedTitle,
+                            ["content"] = truncatedContent,
                             ["title_vector"] = titleEmbedding,
                             ["content_vector"] = contentEmbedding
                         };
@@ -245,6 +289,13 @@ namespace AzureSearchCrawler
                     {
                         await Task.Delay(_rateLimitDelay, cancellationToken);
                     }
+                }
+
+                // Logga antalet items kvar i kön efter att denna batch är klar
+                var remainingItems = _queue.Count;
+                if (remainingItems > 0)
+                {
+                    _console.WriteLine($"{remainingItems} items left in queue", LogLevel.Information);
                 }
             }
             catch (Exception ex)

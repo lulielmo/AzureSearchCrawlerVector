@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using AzureSearchCrawler.Interfaces;
 
 namespace AzureSearchCrawler.Tests.Mocks
@@ -14,11 +9,15 @@ namespace AzureSearchCrawler.Tests.Mocks
     {
         private readonly float[][] _embeddingValues;
         private readonly bool _shouldThrow;
+        private int _callCount;
+
+        public int CallCount => _callCount;
 
         public MockEmbeddingClient(bool shouldThrow = false, params float[][] embeddingValues)
         {
             _embeddingValues = embeddingValues;
             _shouldThrow = shouldThrow;
+            _callCount = 0;
         }
 
         public Task<IReadOnlyList<float[]>> GenerateEmbeddingsAsync(
@@ -26,6 +25,8 @@ namespace AzureSearchCrawler.Tests.Mocks
             int dimensions,
             CancellationToken cancellationToken = default)
         {
+            _callCount++;
+            
             if (_shouldThrow)
             {
                 throw new Exception("Embedding error");
@@ -50,6 +51,8 @@ namespace AzureSearchCrawler.Tests.Mocks
             int dimensions,
             CancellationToken cancellationToken = default)
         {
+            _callCount++;
+            
             if (_shouldThrow)
             {
                 throw new Exception("Embedding error");

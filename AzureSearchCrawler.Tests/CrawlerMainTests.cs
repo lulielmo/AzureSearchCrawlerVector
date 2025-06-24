@@ -22,8 +22,8 @@ namespace AzureSearchCrawler.Tests
             _processorMock = new Mock<ICrawledPageProcessor>();
 
             // Fabrik som returnerar mockad processor (och en slutförd Task)
-            Func<string, string, string, string, string, string, int, Interfaces.IConsole, CrawledPageQueue, (ICrawledPageProcessor, Task)> processorFactory =
-                (s1, s2, s3, s4, s5, s6, i, console, queue) => (_processorMock.Object, Task.CompletedTask);
+            Func<string, string, string, string, string, string, int, Interfaces.IConsole, CrawledPageQueue, bool, (ICrawledPageProcessor, Task)> processorFactory =
+                (s1, s2, s3, s4, s5, s6, i, console, queue, dryRun) => (_processorMock.Object, Task.CompletedTask);
 
             // Fabrik som returnerar mock-crawler
             Func<ICrawledPageProcessor, CrawlMode, Interfaces.IConsole, IWebCrawlingStrategy> crawlerFactory = 

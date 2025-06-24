@@ -1,9 +1,8 @@
+using AzureSearchCrawler.Adapters;
 using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
-using AzureSearchCrawler.Adapters;
 using System.CommandLine;
 using System.CommandLine.Invocation;
-using System.CommandLine.IO;  // För SystemConsole
 using System.Text.Json;
 
 namespace AzureSearchCrawler
@@ -18,11 +17,11 @@ namespace AzureSearchCrawler
 
         private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-        private readonly Func<string, string, string, string, string, string, int, Interfaces.IConsole, CrawledPageQueue, (ICrawledPageProcessor, Task)> _processorFactory;
+        private readonly Func<string, string, string, string, string, string, int, Interfaces.IConsole, CrawledPageQueue, bool, (ICrawledPageProcessor, Task)> _processorFactory;
         private readonly Func<ICrawledPageProcessor, CrawlMode, Interfaces.IConsole, IWebCrawlingStrategy> _crawlerFactory;
 
         public CrawlerMain(
-            Func<string, string, string, string, string, string, int, Interfaces.IConsole, CrawledPageQueue, (ICrawledPageProcessor, Task)>? processorFactory = null,
+            Func<string, string, string, string, string, string, int, Interfaces.IConsole, CrawledPageQueue, bool, (ICrawledPageProcessor, Task)>? processorFactory = null,
             Func<ICrawledPageProcessor, CrawlMode, Interfaces.IConsole, IWebCrawlingStrategy>? crawlerFactory = null)
         {
             _processorFactory = processorFactory ?? DefaultProcessorFactory;
@@ -32,12 +31,12 @@ namespace AzureSearchCrawler
         private (ICrawledPageProcessor, Task) DefaultProcessorFactory(
             string serviceEndPoint, string adminApiKey, string indexName, 
             string embeddingEndpoint, string embeddingKey, string embeddingDeployment, 
-            int embeddingDimensions, Interfaces.IConsole console, CrawledPageQueue queue)
+            int embeddingDimensions, Interfaces.IConsole console, CrawledPageQueue queue, bool dryRun = false)
         {
             var processor = new VectorizedPageProcessor(
                 serviceEndPoint, adminApiKey, indexName, 
                 embeddingEndpoint, embeddingKey, embeddingDeployment, 
-                embeddingDimensions, console, queue);
+                embeddingDimensions, console, queue, dryRun, rateLimitDelay: null);
 
             return (processor, processor.ProcessQueueAsync());
         }
@@ -270,13 +269,7 @@ namespace AzureSearchCrawler
                         embeddingEndPoint, 
                         embeddingAdminKey ?? throw new ArgumentException("Embedding admin key is required"),
                         embeddingDeploymentName  ?? throw new ArgumentException("Embedding deployment name is required"),
-                        azureOpenAIEmbeddingDimensions, console, queue);
-
-                    if (dryRun)
-                    {
-                        // I dry run vill vi inte att processorn kör i bakgrunden
-                        processorTask = Task.CompletedTask;
-                    }
+                        azureOpenAIEmbeddingDimensions, console, queue, dryRun);
 
                     foreach (var site in sites)
                     {

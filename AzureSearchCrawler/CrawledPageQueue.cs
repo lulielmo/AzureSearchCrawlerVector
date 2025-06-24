@@ -17,6 +17,11 @@ namespace AzureSearchCrawler
         public bool IsEmptyAndComplete => _queue.IsEmpty && _isComplete;
 
         /// <summary>
+        /// Gets the number of items in the queue.
+        /// </summary>
+        public int Count => _queue.Count;
+
+        /// <summary>
         /// Adds a crawled page to the queue.
         /// </summary>
         /// <param name="page">The page to add.</param>
