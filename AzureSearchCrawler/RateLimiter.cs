@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
 using System.Diagnostics;
@@ -9,7 +6,7 @@ namespace AzureSearchCrawler
 {
     public class RateLimiter : IDisposable
     {
-        private readonly SemaphoreSlim _semaphore = new(1, 1);
+        private readonly SemaphoreSlim _semaphore;
         private readonly Stopwatch _stopwatch = new();
         private readonly TimeSpan _minTimeBetweenCalls;
         private readonly bool _enabled;
@@ -17,14 +14,15 @@ namespace AzureSearchCrawler
         private bool _isFirstCall = true;
         private bool _isDisposed;
         private DateTime _lastCallTime = DateTime.MinValue;
+        private readonly TimeSpan _semaphoreTimeout;
 
-        public bool Enabled => _enabled;
-
-        public RateLimiter(TimeSpan minTimeBetweenCalls, bool enabled = true, IConsole? console = null)
+        public RateLimiter(TimeSpan minTimeBetweenCalls, bool enabled = true, IConsole? console = null, SemaphoreSlim? semaphore = null, TimeSpan? semaphoreTimeout = null)
         {
             _minTimeBetweenCalls = minTimeBetweenCalls;
             _enabled = enabled;
             _console = console;
+            _semaphore = semaphore ?? new SemaphoreSlim(1, 1);
+            _semaphoreTimeout = semaphoreTimeout ?? TimeSpan.FromSeconds(10);
             _stopwatch.Start();
             _console?.WriteLine($"RateLimiter created with enabled={enabled}, minTimeBetweenCalls={minTimeBetweenCalls}", LogLevel.Debug);
         }
@@ -42,7 +40,7 @@ namespace AzureSearchCrawler
             try
             {
                 // Try to acquire the semaphore with a timeout
-                if (!await _semaphore.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken))
+                if (!await _semaphore.WaitAsync(_semaphoreTimeout, cancellationToken))
                 {
                     _console?.WriteLine("Failed to acquire semaphore within timeout", LogLevel.Warning);
                     throw new TimeoutException("Failed to acquire rate limiter semaphore within timeout");
