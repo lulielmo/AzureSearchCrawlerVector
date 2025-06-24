@@ -48,5 +48,15 @@ namespace AzureSearchCrawler.Models
             StatusCode = statusCode;
             ErrorMessage = errorMessage;
         }
+
+        public Uri Url { get; }
+
+        public CrawledWebPage(Uri url, string title, string content, int statusCode)
+        {
+            Url = url;
+            Title = title;
+            Content = content;
+            StatusCode = statusCode;
+        }
     }
 } 

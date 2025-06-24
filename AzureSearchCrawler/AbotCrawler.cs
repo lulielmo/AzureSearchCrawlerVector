@@ -20,20 +20,20 @@ namespace AzureSearchCrawler
         private bool _isDisposed;
         private readonly object _lock = new();
 
-        private readonly CrawledPageQueue _queue;
+        private readonly ICrawledPageProcessor _processor;
         private readonly Func<CrawlConfiguration, IWebCrawler> _webCrawlerFactory;
         private readonly IConsole _console;
         private string? _domSelector;
         private IWebCrawler? _crawler;
 
-        public AbotCrawler(CrawledPageQueue queue, IConsole console, string? domSelector = null)
-            : this(queue, config => new PoliteWebCrawler(config), console, domSelector)
+        public AbotCrawler(ICrawledPageProcessor processor, IConsole console, string? domSelector = null)
+            : this(processor, config => new PoliteWebCrawler(config), console, domSelector)
         {
         }
 
-        public AbotCrawler(CrawledPageQueue queue, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, IConsole console, string? domSelector = null)
+        public AbotCrawler(ICrawledPageProcessor processor, Func<CrawlConfiguration, IWebCrawler> crawlerFactory, IConsole console, string? domSelector = null)
         {
-            _queue = queue ?? throw new ArgumentNullException(nameof(queue));
+            _processor = processor ?? throw new ArgumentNullException(nameof(processor));
             _webCrawlerFactory = crawlerFactory ?? throw new ArgumentNullException(nameof(crawlerFactory));
             _console = console ?? throw new ArgumentNullException(nameof(console));
             _pageCount = 0;
@@ -173,7 +173,7 @@ namespace AzureSearchCrawler
                     throw error;
                 }
 
-                if (result.ErrorOccurred)
+                if (result.ErrorOccurred || result.ErrorException != null)
                 {
                     if (result.ErrorException != null)
                     {
@@ -189,19 +189,18 @@ namespace AzureSearchCrawler
                 }
                 else
                 {
+                    //_console.WriteLine($"Crawl completed successfully. Processed {_pageCount} pages.", LogLevel.Information);
                     _console.WriteLine($"Crawl completed successfully: {_pageCount} pages processed in {duration.TotalSeconds:F2} seconds", LogLevel.Information);
                 }
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex)
             {
-                _console.WriteLine($"Crawl failed with critical error: {ex.Message}", LogLevel.Error);
-                _console.WriteLine($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
+                _console.WriteLine($"Critical error during crawl: {ex.Message}", LogLevel.Error);
+                _console.WriteLine($"Technical details: {ex}", LogLevel.Debug);
                 throw;
             }
             finally
             {
-                _queue.MarkAsComplete();
-                
                 lock (_lock)
                 {
                     if (_crawler != null)
@@ -248,14 +247,14 @@ namespace AzureSearchCrawler
 
                 try
                 {
-                    var page = new CrawledWebPage(
+                    var crawledWebPage = new CrawledWebPage(
                         e.CrawledPage.Uri,
                         e.CrawledPage.AngleSharpHtmlDocument?.QuerySelector("title")?.TextContent ?? string.Empty,
                         e.CrawledPage.AngleSharpHtmlDocument?.Body?.TextContent ?? string.Empty,
                         (int)e.CrawledPage.HttpResponseMessage.StatusCode,
                         null);
 
-                    _queue.Enqueue(page);
+                    await _processor.PageCrawledAsync(crawledWebPage);
                     tcs.TrySetResult();
                 }
                 catch (Exception ex)

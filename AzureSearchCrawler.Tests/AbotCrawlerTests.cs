@@ -1,30 +1,20 @@
 ﻿using Abot2.Crawler;
 using Abot2.Poco;
-using AngleSharp;
 using AngleSharp.Html.Parser;
 using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
 using AzureSearchCrawler.TestUtilities;
 using Moq;
-using Xunit;
-using System.Reflection;
-using Microsoft.Playwright;
-using Azure.Search.Documents;
-using Azure.AI.OpenAI;
-using OpenAI.Embeddings;
-using System;
-using System.Threading.Tasks;
 using System.Net;
-using System.Threading;
+using System.Reflection;
+using Xunit;
 
 namespace AzureSearchCrawler.Tests
 {
-
     public class AbotCrawlerTests : IDisposable
     {
         private readonly Mock<IWebCrawler> _webCrawlerMock;
-        private readonly Mock<ICrawledPageProcessor> _handlerMock;
-        private readonly Mock<CrawledPageQueue> _queueMock;
+        private readonly Mock<ICrawledPageProcessor> _processorMock;
         private readonly TestConsole _console;
         private readonly AbotCrawler _crawler;
         private readonly StringWriter _stringWriter;
@@ -34,8 +24,7 @@ namespace AzureSearchCrawler.Tests
         public AbotCrawlerTests()
         {
             _webCrawlerMock = new Mock<IWebCrawler>();
-            _handlerMock = new Mock<ICrawledPageProcessor>();
-            _queueMock = new Mock<CrawledPageQueue>();
+            _processorMock = new Mock<ICrawledPageProcessor>();
             _console = new TestConsole();
             _stringWriter = new StringWriter();
             _originalOut = Console.Out;
@@ -44,7 +33,7 @@ namespace AzureSearchCrawler.Tests
             Console.SetOut(_stringWriter);
             Console.SetError(_stringWriter);
 
-            _crawler = new AbotCrawler(_queueMock.Object, _ => _webCrawlerMock.Object, _console);
+            _crawler = new AbotCrawler(_processorMock.Object, _ => _webCrawlerMock.Object, _console);
         }
 
         private bool _disposed = false;
@@ -95,14 +84,6 @@ namespace AzureSearchCrawler.Tests
                 CrawlContext = new CrawlContext()
             };
 
-            // Skapa en riktig kö istället för en mock
-            var queue = new CrawledPageQueue();
-            var crawler = new AbotCrawler(queue, config =>
-            {
-                _lastConfig = config;
-                return _webCrawlerMock.Object;
-            }, _console);
-
             _webCrawlerMock
                 .Setup(c => c.CrawlAsync(It.IsAny<Uri>()))
                 .Callback(() =>
@@ -113,14 +94,14 @@ namespace AzureSearchCrawler.Tests
                 .ReturnsAsync(crawlResult);
 
             // Act
-            await crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1);
+            await _crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1);
 
             // Assert
-            Assert.True(queue.TryDequeue(out var dequeuedPage), "No page was added to the queue");
-            Assert.NotNull(dequeuedPage);
-            Assert.Equal(uri, dequeuedPage.Uri);
-            Assert.Equal("Some content", dequeuedPage.Content);
-            Assert.Equal((int)HttpStatusCode.OK, dequeuedPage.StatusCode);
+            _processorMock.Verify(x => x.PageCrawledAsync(It.Is<CrawledWebPage>(p => 
+                p.Uri == uri && 
+                p.Content == "Some content" && 
+                p.StatusCode == (int)HttpStatusCode.OK)), 
+                Times.Once);
         }
 
         [Theory]
@@ -139,43 +120,24 @@ namespace AzureSearchCrawler.Tests
         }
 
         [Fact]
-        public async Task CrawlAsync_WhenCrawlingFails_MarksQueueAsComplete()
+        public async Task CrawlAsync_WhenCrawlingFails_LogsError()
         {
             // Arrange
             var uri = new Uri("http://example.com");
-            var exception = new Exception("Test error");
-            var crawlResult = new CrawlResult
-            {
-                RootUri = uri,
-                CrawlContext = new CrawlContext(),
-                ErrorException = exception
-            };
+            var exception = new Exception("Test exception");
+            var crawlResult = new CrawlResult { ErrorException = exception };
 
-            // Skapa en riktig kö istället för en mock
-            var queue = new CrawledPageQueue();
-            var crawler = new AbotCrawler(queue, config =>
-            {
-                _lastConfig = config;
-                return _webCrawlerMock.Object;
-            }, _console);
+            _webCrawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>())).ReturnsAsync(crawlResult);
 
-            _webCrawlerMock
-                .Setup(c => c.CrawlAsync(It.IsAny<Uri>()))
-                .ReturnsAsync(crawlResult);
+            // Act
+            await Assert.ThrowsAsync<Exception>(() => _crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1));
 
-            // Act & Assert
-            var thrownException = await Assert.ThrowsAsync<Exception>(() => 
-                crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1));
-            
-            // Verify the exception is the same one we provided
-            Assert.Same(exception, thrownException);
-            
-            // Verify that the queue was marked as complete
-            Assert.True(queue.IsEmptyAndComplete, "Queue should be empty and marked as complete after crawl failure");
+            // Assert
+            Assert.Contains(_console.Errors, s => s.Contains("Crawl failed with critical error: Test exception"));
         }
 
         [Fact]
-        public async Task CrawlAsync_WhenPageCrawled_AddsToQueue()
+        public async Task CrawlAsync_WhenPageCrawled_CallsProcessor()
         {
             // Arrange
             var uri = new Uri("http://example.com");
@@ -191,16 +153,7 @@ namespace AzureSearchCrawler.Tests
                 CrawlContext = new CrawlContext()
             };
 
-            var pageProcessed = new TaskCompletionSource<bool>();
             var eventRaised = new TaskCompletionSource<bool>();
-
-            // Skapa en riktig kö istället för en mock
-            var queue = new CrawledPageQueue();
-            var crawler = new AbotCrawler(queue, config =>
-            {
-                _lastConfig = config;
-                return _webCrawlerMock.Object;
-            }, _console);
 
             _webCrawlerMock
                 .Setup(c => c.CrawlAsync(It.IsAny<Uri>()))
@@ -214,7 +167,7 @@ namespace AzureSearchCrawler.Tests
                 .ReturnsAsync(crawlResult);
 
             // Act
-            var crawlTask = crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1);
+            var crawlTask = _crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1);
             
             // Wait for both the crawl to complete and the page to be processed
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -225,12 +178,12 @@ namespace AzureSearchCrawler.Tests
             // Assert
             Assert.True(eventRaised.Task.IsCompleted, "PageCrawlCompleted event was not raised");
             
-            // Verifiera att sidan lades till i kön
-            Assert.True(queue.TryDequeue(out var dequeuedPage), "No page was added to the queue");
-            Assert.NotNull(dequeuedPage);
-            Assert.Equal(uri, dequeuedPage.Uri);
-            Assert.Equal("Some content", dequeuedPage.Content);
-            Assert.Equal((int)HttpStatusCode.OK, dequeuedPage.StatusCode);
+            // Verify that the processor was called with the correct page
+            _processorMock.Verify(x => x.PageCrawledAsync(It.Is<CrawledWebPage>(p => 
+                p.Uri == uri && 
+                p.Content == "Some content" && 
+                p.StatusCode == (int)HttpStatusCode.OK)), 
+                Times.Once);
         }
 
         [Fact]
@@ -292,11 +245,11 @@ namespace AzureSearchCrawler.Tests
             await _crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1);
 
             // Assert
-            _handlerMock.Verify(h => h.PageCrawledAsync(It.IsAny<CrawledPage>()), Times.Never);
+            _processorMock.Verify(x => x.PageCrawledAsync(It.IsAny<CrawledWebPage>()), Times.Never);
         }
 
         [Fact]
-        public async Task CrawlAsync_WhenPageHasNoContent_AddsToQueue()
+        public async Task CrawlAsync_WhenPageHasNoContent_CallsProcessor()
         {
             // Arrange
             var uri = new Uri("http://example.com");
@@ -312,14 +265,6 @@ namespace AzureSearchCrawler.Tests
                 CrawlContext = new CrawlContext()
             };
 
-            // Skapa en riktig kö istället för en mock
-            var queue = new CrawledPageQueue();
-            var crawler = new AbotCrawler(queue, config =>
-            {
-                _lastConfig = config;
-                return _webCrawlerMock.Object;
-            }, _console);
-
             _webCrawlerMock
                 .Setup(c => c.CrawlAsync(It.IsAny<Uri>()))
                 .Callback(() =>
@@ -330,24 +275,19 @@ namespace AzureSearchCrawler.Tests
                 .ReturnsAsync(crawlResult);
 
             // Act
-            await crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1);
+            await _crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1);
 
             // Assert
-            Assert.True(queue.TryDequeue(out var dequeuedPage), "No page was added to the queue");
-            Assert.NotNull(dequeuedPage);
-            Assert.Equal(uri, dequeuedPage.Uri);
-            Assert.Equal("", dequeuedPage.Content);
-            Assert.Equal((int)HttpStatusCode.OK, dequeuedPage.StatusCode);
+            _processorMock.Verify(x => x.PageCrawledAsync(It.IsAny<CrawledWebPage>()), Times.Once);
         }
 
         [Fact]
-        public async Task CrawlAsync_WhenPageHasHttpException_DoesNotCallHandler()
+        public async Task CrawlAsync_WhenPageHasHttpRequestException_DoesNotProcessPage()
         {
             // Arrange
             var uri = new Uri("http://example.com");
             var crawledPage = new CrawledPage(uri)
             {
-                HttpResponseMessage = new HttpResponseMessage(System.Net.HttpStatusCode.OK),
                 HttpRequestException = new HttpRequestException("Network error")
             };
 
@@ -370,7 +310,39 @@ namespace AzureSearchCrawler.Tests
             await _crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1);
 
             // Assert
-            _handlerMock.Verify(h => h.PageCrawledAsync(It.IsAny<CrawledPage>()), Times.Never);
+            _processorMock.Verify(x => x.PageCrawledAsync(It.IsAny<CrawledWebPage>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task CrawlAsync_WhenPageHasNon200StatusCode_DoesNotProcessPage()
+        {
+            // Arrange
+            var uri = new Uri("http://example.com");
+            var crawledPage = new CrawledPage(uri)
+            {
+                HttpResponseMessage = new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError)
+            };
+
+            var crawlResult = new CrawlResult
+            {
+                RootUri = uri,
+                CrawlContext = new CrawlContext()
+            };
+
+            _webCrawlerMock
+                .Setup(c => c.CrawlAsync(It.IsAny<Uri>()))
+                .Callback(() =>
+                {
+                    var args = new PageCrawlCompletedArgs(new CrawlContext(), crawledPage);
+                    _webCrawlerMock.Raise(c => c.PageCrawlCompleted += null, _webCrawlerMock.Object, args);
+                })
+                .ReturnsAsync(crawlResult);
+
+            // Act
+            await _crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1);
+
+            // Assert
+            _processorMock.Verify(x => x.PageCrawledAsync(It.IsAny<CrawledWebPage>()), Times.Never);
         }
 
         [Theory]
@@ -428,14 +400,8 @@ namespace AzureSearchCrawler.Tests
                     CrawlContext = new CrawlContext()
                 });
 
-            var crawler = new AbotCrawler(_queueMock.Object, config =>
-            {
-                _lastConfig = config;
-                return _webCrawlerMock.Object;
-            }, _console);
-
             // Act
-            await crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1);
+            await _crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1);
 
             // Assert
             Assert.NotNull(capturedConfig);
@@ -537,7 +503,7 @@ namespace AzureSearchCrawler.Tests
             // Arrange
             var uri = new Uri("http://example.com");
             var testConsole = new TestConsole();
-            var crawler = new AbotCrawler(_queueMock.Object, config =>
+            var crawler = new AbotCrawler(_processorMock.Object, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
@@ -584,7 +550,7 @@ namespace AzureSearchCrawler.Tests
             // Arrange
             var uri = new Uri("http://example.com");
             var testConsole = new TestConsole();
-            var crawler = new AbotCrawler(_queueMock.Object, config =>
+            var crawler = new AbotCrawler(_processorMock.Object, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
@@ -631,39 +597,7 @@ namespace AzureSearchCrawler.Tests
             // Arrange
             var uri = new Uri("http://example.com");
             var testConsole = new TestConsole();
-            var mockTextExtractor = new Mock<TextExtractor>();
-            var mockSearchClient = new Mock<SearchClient>();
-            var mockAiClient = new Mock<AzureOpenAIClient>();
-            var mockEmbeddingClient = new Mock<EmbeddingClient>();
-
-            var queue = new CrawledPageQueue();
-
-            var indexer = new AzureSearchIndexer(
-                "https://test.search.windows.net",
-                "test-index",
-                "test-key",
-                "https://test.ai.windows.net",
-                "test-key2",
-                "ai-deployment",
-                1,
-                true,
-                mockTextExtractor.Object,
-                false,
-                testConsole);
-
-            // Inject mocked clients
-            var searchClientField = typeof(AzureSearchIndexer)
-                .GetField("_searchClient", BindingFlags.NonPublic | BindingFlags.Instance);
-            searchClientField!.SetValue(indexer, mockSearchClient.Object);
-
-            var aiClientField = typeof(AzureSearchIndexer)
-                .GetField("_azureOpenAIClient", BindingFlags.NonPublic | BindingFlags.Instance);
-            aiClientField!.SetValue(indexer, mockAiClient.Object);
-
-            var embeddingClientField = typeof(AzureSearchIndexer)
-                .GetField("_embeddingClient", BindingFlags.NonPublic | BindingFlags.Instance);
-            embeddingClientField!.SetValue(indexer, mockEmbeddingClient.Object);
-
+            
             // Skapa test HTML
             var htmlContent = @"
                 <html>
@@ -677,54 +611,59 @@ namespace AzureSearchCrawler.Tests
                     </body>
                 </html>";
 
-            // Skapa AngleSharp dokument
-            //var context = BrowsingContext.New();
-            //var document = await context.OpenAsync(req => req.Content(htmlContent));
-
             var crawledPage = new CrawledPage(uri)
             {
                 Content = new PageContent { Text = htmlContent }
             };
 
+            // AngleSharpHtmlDocument är intern, så vi måste använda reflektion för att sätta den
+            /*var parser = new HtmlParser();
+            var document = await parser.ParseDocumentAsync(crawledPage.Content.Text);
+            var propertyInfo = typeof(CrawledPage).GetProperty("AngleSharpHtmlDocument");
+            propertyInfo.SetValue(crawledPage, document);*/
+
             Func<Uri, CrawledPage, CrawlContext, bool>? linkDecisionMaker = null;
             _webCrawlerMock.SetupSet(c => c.ShouldScheduleLinkDecisionMaker = It.IsAny<Func<Uri, CrawledPage, CrawlContext, bool>>())
                 .Callback<Func<Uri, CrawledPage, CrawlContext, bool>>(func => linkDecisionMaker = func);
 
+            //_webCrawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>()))
+            //    .ReturnsAsync(new CrawlResult 
+            //    { 
+            //        RootUri = uri,
+            //        CrawlContext = new CrawlContext()
+            //    });
+
             _webCrawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>()))
-                .Callback(() => 
+                .Callback(() =>
                 {
                     var goodLink = new Uri(uri, "/blog/posts/good-link.html");
                     var badLink = new Uri(uri, "/blog/posts/bad-link.html");
-                    
+
                     Assert.NotNull(linkDecisionMaker);
                     var goodDecision = linkDecisionMaker(goodLink, crawledPage, new CrawlContext());
                     var badDecision = linkDecisionMaker(badLink, crawledPage, new CrawlContext());
-                    
+
                     Assert.True(goodDecision, "Good link should be allowed");
                     Assert.False(badDecision, "Bad link should be filtered out");
                 })
-                .ReturnsAsync(new CrawlResult 
-                { 
+                .ReturnsAsync(new CrawlResult
+                {
                     RootUri = uri,
                     CrawlContext = new CrawlContext()
                 });
 
-            var crawler = new AbotCrawler(queue, config =>
-            {
-                _lastConfig = config;
-                return _webCrawlerMock.Object;
-            }, testConsole);
+            var crawler = new AbotCrawler(_processorMock.Object, config => _webCrawlerMock.Object, testConsole);
             
             // Act
             await crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1, domSelector: "div.blog-content");
 
             // Assert
             Assert.NotNull(linkDecisionMaker);
-            var goodDecision = linkDecisionMaker(new Uri(uri, "/blog/posts/good-link.html"), crawledPage, new CrawlContext());
-            var badDecision = linkDecisionMaker(new Uri(uri, "/blog/posts/bad-link.html"), crawledPage, new CrawlContext());
+            var goodLink = new Uri(uri, "/blog/posts/good-link.html");
+            var badLink = new Uri(uri, "/blog/posts/bad-link.html");
             
-            Assert.True(goodDecision, "Good link should be allowed");
-            Assert.False(badDecision, "Bad link should be filtered out");
+            Assert.True(linkDecisionMaker(goodLink, crawledPage, new CrawlContext()), "Good link should be allowed");
+            Assert.False(linkDecisionMaker(badLink, crawledPage, new CrawlContext()), "Bad link should be filtered out");
         }
 
         [Fact]
@@ -753,7 +692,7 @@ namespace AzureSearchCrawler.Tests
             
             Func<Uri, CrawledPage, CrawlContext, bool>? linkDecisionMaker = null;
             
-            var crawler = new AbotCrawler(_queueMock.Object, config =>
+            var crawler = new AbotCrawler(_processorMock.Object, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
@@ -804,7 +743,7 @@ namespace AzureSearchCrawler.Tests
             var testConsole = new TestConsole();
             testConsole.SetVerbose(false);
             
-            var crawler = new AbotCrawler(_queueMock.Object, config =>
+            var crawler = new AbotCrawler(_processorMock.Object, config =>
             {
                 _lastConfig = config;
                 return _webCrawlerMock.Object;
@@ -892,7 +831,7 @@ namespace AzureSearchCrawler.Tests
         }
 
         [Fact]
-        public async Task CrawlAsync_WithValidUri_AddsToQueue()
+        public async Task CrawlAsync_WithValidUri_CallsProcessor()
         {
             // Arrange
             var uri = new Uri("http://example.com");
@@ -908,14 +847,6 @@ namespace AzureSearchCrawler.Tests
                 CrawlContext = new CrawlContext()
             };
 
-            // Skapa en riktig kö istället för en mock
-            var queue = new CrawledPageQueue();
-            var crawler = new AbotCrawler(queue, config =>
-            {
-                _lastConfig = config;
-                return _webCrawlerMock.Object;
-            }, _console);
-
             _webCrawlerMock
                 .Setup(c => c.CrawlAsync(It.IsAny<Uri>()))
                 .Callback(() =>
@@ -926,14 +857,14 @@ namespace AzureSearchCrawler.Tests
                 .ReturnsAsync(crawlResult);
 
             // Act
-            await crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1);
+            await _crawler.CrawlAsync(uri, maxPages: 1, maxDepth: 1);
 
             // Assert
-            Assert.True(queue.TryDequeue(out var dequeuedPage), "No page was added to the queue");
-            Assert.NotNull(dequeuedPage);
-            Assert.Equal(uri, dequeuedPage.Uri);
-            Assert.Equal("Some content", dequeuedPage.Content);
-            Assert.Equal((int)HttpStatusCode.OK, dequeuedPage.StatusCode);
+            _processorMock.Verify(x => x.PageCrawledAsync(It.Is<CrawledWebPage>(p => 
+                p.Uri == uri && 
+                p.Content == "Some content" && 
+                p.StatusCode == (int)HttpStatusCode.OK)), 
+                Times.Once);
         }
 
         [Fact]

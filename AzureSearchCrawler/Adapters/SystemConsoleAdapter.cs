@@ -60,4 +60,6 @@ public class SystemConsoleAdapter(System.CommandLine.IConsole console) : Interfa
     }
 
     public void SetVerbose(bool verbose) => _verbose = verbose;
+
+    public System.CommandLine.IConsole GetInnerConsole() => _console;
 }

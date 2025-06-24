@@ -7,7 +7,8 @@ namespace AzureSearchCrawler
 {
     public class HeadlessBrowserCrawler : IWebCrawlingStrategy, IDisposable
     {
-        private readonly CrawledPageQueue _queue;
+        //private readonly CrawledPageQueue _queue;
+        private readonly ICrawledPageProcessor _processor;
         private readonly IConsole _console;
         private readonly IPlaywright _playwright;
         private readonly IBrowser _browser;
@@ -15,11 +16,12 @@ namespace AzureSearchCrawler
         private readonly bool _ownsPlaywright;
         private bool _disposed;
 
-        public HeadlessBrowserCrawler(CrawledPageQueue queue, IConsole console, IPlaywright? playwright = null)
+        public HeadlessBrowserCrawler(ICrawledPageProcessor processor, IConsole console, IPlaywright? playwright = null)
         {
-            _queue = queue ?? throw new ArgumentNullException(nameof(queue));
+            //_queue = queue ?? throw new ArgumentNullException(nameof(queue));
+            _processor = processor ?? throw new ArgumentNullException(nameof(processor));
             _console = console ?? throw new ArgumentNullException(nameof(console));
-            
+
             if (playwright == null)
             {
                 _ownsPlaywright = true;
@@ -33,6 +35,25 @@ namespace AzureSearchCrawler
 
             _browser = _playwright.Chromium.LaunchAsync().GetAwaiter().GetResult();
         }
+
+        //public HeadlessBrowserCrawler(CrawledPageQueue queue, IConsole console, IPlaywright? playwright = null)
+        //{
+        //    _queue = queue ?? throw new ArgumentNullException(nameof(queue));
+        //    _console = console ?? throw new ArgumentNullException(nameof(console));
+
+        //    if (playwright == null)
+        //    {
+        //        _ownsPlaywright = true;
+        //        _playwright = Playwright.CreateAsync().GetAwaiter().GetResult();
+        //    }
+        //    else
+        //    {
+        //        _ownsPlaywright = false;
+        //        _playwright = playwright;
+        //    }
+
+        //    _browser = _playwright.Chromium.LaunchAsync().GetAwaiter().GetResult();
+        //}
 
         public void Dispose()
         {
@@ -166,7 +187,8 @@ namespace AzureSearchCrawler
                     response.Status,
                     null);
 
-                _queue.Enqueue(crawledPage);
+                //_queue.Enqueue(crawledPage);
+                await _processor.PageCrawledAsync(crawledPage);
 
                 // Don't extract links if we're at max depth
                 if (currentDepth >= maxDepth)

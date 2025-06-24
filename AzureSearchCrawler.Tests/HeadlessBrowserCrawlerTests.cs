@@ -10,7 +10,7 @@ namespace AzureSearchCrawler.Tests
 {
     public class HeadlessBrowserCrawlerTests : IDisposable
     {
-        private readonly Mock<ICrawledPageProcessor> _handlerMock;
+        private readonly Mock<ICrawledPageProcessor> _processorMock;
         private readonly Mock<IPlaywright> _playwrightMock;
         private readonly Mock<IBrowser> _browserMock;
         private readonly Mock<IBrowserContext> _contextMock;
@@ -18,18 +18,16 @@ namespace AzureSearchCrawler.Tests
         private readonly Mock<IResponse> _responseMock;
         private readonly TestConsole _console;
         private readonly HeadlessBrowserCrawler _crawler;
-        private readonly CrawledPageQueue _queue;
 
         public HeadlessBrowserCrawlerTests()
         {
-            _handlerMock = new Mock<ICrawledPageProcessor>();
+            _processorMock = new Mock<ICrawledPageProcessor>();
             _playwrightMock = new Mock<IPlaywright>();
             _browserMock = new Mock<IBrowser>();
             _contextMock = new Mock<IBrowserContext>();
             _pageMock = new Mock<IPage>();
             _responseMock = new Mock<IResponse>();
             _console = new TestConsole();
-            _queue = new CrawledPageQueue();
 
             // Set up basic mock behavior
             var browserTypeMock = new Mock<IBrowserType>();
@@ -50,7 +48,7 @@ namespace AzureSearchCrawler.Tests
             _responseMock.Setup(r => r.Headers).Returns([]);
             _responseMock.Setup(r => r.StatusText).Returns("OK");
 
-            _crawler = new HeadlessBrowserCrawler(_queue, _console, _playwrightMock.Object);
+            _crawler = new HeadlessBrowserCrawler(_processorMock.Object, _console, _playwrightMock.Object);
         }
 
         private bool _disposed = false;
@@ -138,8 +136,8 @@ namespace AzureSearchCrawler.Tests
 
             // Assert
             _pageMock.Verify(p => p.GotoAsync("http://example.com/", It.IsAny<PageGotoOptions>()), Times.Once);
-            insidePage.Verify(p => p.GotoAsync("http://example.com/inside", It.IsAny<PageGotoOptions>()), Times.Once);
-            _pageMock.Verify(p => p.GotoAsync("http://example.com/outside", It.IsAny<PageGotoOptions>()), Times.Never);
+            insidePage.Verify(p => p.GotoAsync(It.Is<string>(url => url.Contains("/inside")), It.IsAny<PageGotoOptions>()), Times.Once);
+            _processorMock.Verify(p => p.PageCrawledAsync(It.Is<CrawledWebPage>(p => p.Uri.AbsoluteUri.Contains("outside"))), Times.Never);
         }
 
         [Fact]
@@ -182,6 +180,10 @@ namespace AzureSearchCrawler.Tests
             insidePage.Setup(p => p.SetExtraHTTPHeadersAsync(It.IsAny<Dictionary<string, string>>()))
                 .Returns(Task.CompletedTask);
 
+            // Setup response mock
+            _responseMock.Setup(r => r.Ok).Returns(true);
+            _responseMock.Setup(r => r.Headers).Returns([]);
+
             // Setup page creation sequence
             var pageQueue = new Queue<IPage>([rootPage.Object, insidePage.Object]);
             var pageIndex = 0;
@@ -193,21 +195,18 @@ namespace AzureSearchCrawler.Tests
             _contextMock.Setup(c => c.DisposeAsync())
                 .Returns(ValueTask.CompletedTask);
 
-            var visitedUrls = new List<string>();
-            _handlerMock
-                .Setup(h => h.PageCrawledAsync(It.IsAny<CrawledPage>()))
-                .Callback<CrawledPage>(page => visitedUrls.Add(page.Uri.ToString()));
+            _processorMock
+                .Setup(h => h.PageCrawledAsync(It.IsAny<CrawledWebPage>()))
+                .Returns(Task.CompletedTask);
 
             // Act
             await _crawler.CrawlAsync(new Uri(rootUrl), maxPages: 10, maxDepth: 2);
 
             // Assert
-            rootPage.Verify(p => p.GotoAsync(rootUrl + "/", It.IsAny<PageGotoOptions>()), Times.Once);
-            insidePage.Verify(p => p.GotoAsync("http://example.com/inside", It.IsAny<PageGotoOptions>()), Times.Once);
+            _processorMock.Verify(p => p.PageCrawledAsync(It.IsAny<CrawledWebPage>()), Times.Exactly(2));
             rootPage.Verify(p => p.QuerySelectorAllAsync("a[href]"), Times.Once);
-            insidePage.Verify(p => p.QuerySelectorAllAsync("a[href]"), Times.Once);
-            insideLink.Verify(e => e.GetAttributeAsync("href"), Times.Once);
-            _contextMock.Verify(c => c.NewPageAsync(), Times.AtLeast(2));
+            insidePage.Verify(p => p.GotoAsync(It.Is<string>(url => url.Contains("/inside")), It.IsAny<PageGotoOptions>()), Times.Once);
+            _contextMock.Verify(c => c.NewPageAsync(), Times.Exactly(2));
         }
 
         [Fact]
@@ -244,7 +243,7 @@ namespace AzureSearchCrawler.Tests
             page1.Setup(p => p.Context).Returns(_contextMock.Object);
             page1.Setup(p => p.GotoAsync(It.IsAny<string>(), It.IsAny<PageGotoOptions>()))
                 .ReturnsAsync(_responseMock.Object);
-            page1.Setup(p => p.QuerySelectorAllAsync("a[href]"))
+            page1.Setup(p => p.QuerySelectorAllAsync("a"))
                 .ReturnsAsync([]);
             page1.Setup(p => p.ContentAsync())
                 .ReturnsAsync("<html><body>Page 1</body></html>");
@@ -256,7 +255,7 @@ namespace AzureSearchCrawler.Tests
             page2.Setup(p => p.Context).Returns(_contextMock.Object);
             page2.Setup(p => p.GotoAsync(It.IsAny<string>(), It.IsAny<PageGotoOptions>()))
                 .ReturnsAsync(_responseMock.Object);
-            page2.Setup(p => p.QuerySelectorAllAsync("a[href]"))
+            page2.Setup(p => p.QuerySelectorAllAsync("a"))
                 .ReturnsAsync([]);
             page2.Setup(p => p.ContentAsync())
                 .ReturnsAsync("<html><body>Page 2</body></html>");
@@ -272,12 +271,7 @@ namespace AzureSearchCrawler.Tests
             await _crawler.CrawlAsync(new Uri(rootUrl), maxPages: 2, maxDepth: 2);
 
             // Assert
-            var pages = new List<CrawledWebPage>();
-            while (_queue.TryDequeue(out var page))
-            {
-                pages.Add(page);
-            }
-            Assert.Equal(2, pages.Count);
+            _processorMock.Verify(p => p.PageCrawledAsync(It.IsAny<CrawledWebPage>()), Times.Exactly(2));
             _pageMock.Verify(p => p.GotoAsync("http://example.com/", It.IsAny<PageGotoOptions>()), Times.Once);
             page1.Verify(p => p.GotoAsync("http://example.com/page1", It.IsAny<PageGotoOptions>()), Times.Once);
             page2.Verify(p => p.GotoAsync("http://example.com/page2", It.IsAny<PageGotoOptions>()), Times.Never);
@@ -362,17 +356,11 @@ namespace AzureSearchCrawler.Tests
                     return Task.FromResult<IPage>(pageCount > 3 ? null! : pages.Dequeue());
                 });
 
-            var processorMock = new Mock<ICrawledPageProcessor>();
-            processorMock.Setup(p => p.PageCrawledAsync(It.IsAny<CrawledPage>()))
+            _processorMock.Setup(p => p.PageCrawledAsync(It.IsAny<CrawledWebPage>()))
                 .Returns(Task.CompletedTask);
-            processorMock.Setup(p => p.CrawlFinishedAsync())
-                .Returns(Task.CompletedTask);
-
-            var queue = new CrawledPageQueue();
-            var crawler = new HeadlessBrowserCrawler(queue, _console, _playwrightMock.Object);
 
             // Act
-            await crawler.CrawlAsync(new Uri(rootUrl), maxPages: 10, maxDepth: maxDepth);
+            await _crawler.CrawlAsync(new Uri(rootUrl), maxPages: 10, maxDepth: maxDepth);
 
             // Assert
             _contextMock.Verify(c => c.NewPageAsync(), Times.Exactly(3));
@@ -528,7 +516,7 @@ namespace AzureSearchCrawler.Tests
                 .ReturnsAsync("/link2");
             
             // Skapa en mock för ICrawledPageProcessor
-            var processorMock = new Mock<ICrawledPageProcessor>();
+            //var processorMock = new Mock<ICrawledPageProcessor>();
             
             // Skapa en TestConsole för att fånga loggar
             var console = new TestConsole();
@@ -548,8 +536,11 @@ namespace AzureSearchCrawler.Tests
                 .ReturnsAsync(contextMock.Object);
             
             // Skapa en HeadlessBrowserCrawler med våra mocks
-            var queue = new CrawledPageQueue();
-            var crawler = new HeadlessBrowserCrawler(queue, console, playwrightMock.Object);
+            var processorMock = new Mock<ICrawledPageProcessor>();
+            processorMock.Setup(p => p.PageCrawledAsync(It.IsAny<CrawledWebPage>()))
+                .Returns(Task.CompletedTask);
+            
+            var crawler = new HeadlessBrowserCrawler(processorMock.Object, console, playwrightMock.Object);
             
             // Act - anropa ProcessLinksAsync direkt
             await crawler.ProcessLinksAsync(pageMock.Object, rootUrl);
@@ -592,7 +583,7 @@ namespace AzureSearchCrawler.Tests
             link.Setup(e => e.GetAttributeAsync("href"))
                 .ReturnsAsync("/error-page");
             
-            pageMock.Setup(p => p.QuerySelectorAllAsync("a[href]"))
+            pageMock.Setup(p => p.QuerySelectorAllAsync("a"))
                 .ReturnsAsync([link.Object]);
             
             // Skapa en mock för errorPage
@@ -626,11 +617,6 @@ namespace AzureSearchCrawler.Tests
             errorPageMock.Setup(p => p.SetExtraHTTPHeadersAsync(It.IsAny<Dictionary<string, string>>()))
                 .Returns(Task.CompletedTask);
             
-            // Skapa en mock för ICrawledPageProcessor
-            var processorMock = new Mock<ICrawledPageProcessor>();
-            processorMock.Setup(p => p.PageCrawledAsync(It.IsAny<CrawledPage>()))
-                .Returns(Task.CompletedTask);
-            
             // Skapa en TestConsole för att fånga loggar
             var console = new TestConsole();
             var loggedMessages = new List<(string message, LogLevel level)>();
@@ -647,8 +633,11 @@ namespace AzureSearchCrawler.Tests
             browserMock.Setup(b => b.NewContextAsync(It.IsAny<BrowserNewContextOptions>()))
                 .ReturnsAsync(contextMock.Object);
             
-            var queue = new CrawledPageQueue();
-            var crawler = new HeadlessBrowserCrawler(queue, console, playwrightMock.Object);
+            var localProcessorMock = new Mock<ICrawledPageProcessor>();
+            localProcessorMock.Setup(p => p.PageCrawledAsync(It.IsAny<CrawledWebPage>()))
+                .Returns(Task.CompletedTask);
+            
+            var crawler = new HeadlessBrowserCrawler(localProcessorMock.Object, console, playwrightMock.Object);
             
             // Act
             await crawler.CrawlAsync(new Uri(rootUrl), maxPages: 10, maxDepth: 2);

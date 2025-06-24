@@ -1,4 +1,4 @@
-using Abot2.Poco;
+using AzureSearchCrawler.Models;
 
 namespace AzureSearchCrawler.Interfaces
 {
@@ -13,7 +13,7 @@ namespace AzureSearchCrawler.Interfaces
         /// Processes a single crawled page.
         /// </summary>
         /// <param name="page">The crawled page to process</param>
-        Task PageCrawledAsync(CrawledPage page);
+        Task PageCrawledAsync(CrawledWebPage page);
 
         /// <summary>
         /// Called when the crawling process is complete.
