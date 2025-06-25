@@ -40,6 +40,8 @@ The crawler uses a modern, scalable architecture with the following key componen
 - Run CrawlerMain, either from Visual Studio after opening the .sln file, or from the command line after compiling using msbuild.
 - You will need to pass a few command-line arguments, such as your search service endpoint information and the root URL of the site you'd like to crawl. Calling the program without arguments or with -h will list the arguments.
 
+Refer to the **[Wiki](https://github.com/lulielmo/AzureSearchCrawlerVector/wiki)** for more detailed instructions for setting up the needed services in Azure.
+
 # Running the application
 
 ## Command line options
