@@ -51,7 +51,7 @@
         "facetable": false,
         "key": false,
         "dimensions": 3072,
-        "vectorSearchProfile": "vector-aibot-scraper-azureOpenAi-text-profile",
+        "vectorSearchProfile": "<name of your Vector Search Profile>",
         "synonymMaps": []
       },
       {
@@ -78,7 +78,7 @@
         "facetable": false,
         "key": false,
         "dimensions": 3072,
-        "vectorSearchProfile": "vector-aibot-scraper-azureOpenAi-text-profile",
+        "vectorSearchProfile": "<name of your Vector Search Profile>",
         "synonymMaps": []
       }
     ],
@@ -101,7 +101,7 @@
     "vectorSearch": {
       "algorithms": [
         {
-          "name": "vector-config-aibot",
+          "name": "<name of your vector search algorithm>",
           "kind": "hnsw",
           "hnswParameters": {
             "metric": "cosine",
@@ -113,23 +113,11 @@
       ],
       "profiles": [
         {
-          "name": "vector-aibot-scraper-azureOpenAi-text-profile",
-          "algorithm": "vector-config-aibot",
-          "vectorizer": "vectorizer-aibot"
+          "name": "<name of your Vector Search Profile>",
+          "algorithm": "<name of your vector search algorithm>"
         }
       ],
-      "vectorizers": [
-        {
-          "name": "vectorizer-aibot",
-          "kind": "azureOpenAI",
-          "azureOpenAIParameters": {
-            "resourceUri": "https://oai-aibot-test-002.openai.azure.com",
-            "deploymentId": "text-embedding-3-large-aibot",
-            "apiKey": "<redacted>",
-            "modelName": "text-embedding-3-large"
-          }
-        }
-      ],
+      "vectorizers": [],
       "compressions": []
     }
   }
