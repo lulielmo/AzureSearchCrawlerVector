@@ -15,6 +15,7 @@ namespace AzureSearchCrawler
         private readonly HttpClient _httpClient;
         private int _processedPages;
         private readonly HashSet<string> _processedSitemaps;
+        private string? _contentSelector;
 
         private static readonly string[] SITEMAP_PATHS =
         [
@@ -199,10 +200,11 @@ namespace AzureSearchCrawler
 
                     var page = new CrawledWebPage(
                         pageUri,
-                        "", // Title will be extracted by the processor
+                        "", // Title is extracted by VectorizedPageProcessor via TextExtractor
                         pageContent,
                         (int)HttpStatusCode.OK,
-                        null);
+                        null,
+                        _contentSelector);
 
                     //_queue.Enqueue(page);
                     await _processor.PageCrawledAsync(page);
@@ -216,11 +218,17 @@ namespace AzureSearchCrawler
             }
         }
 
-        public async Task CrawlAsync(Uri rootUri, int maxPages, int maxDepth, string? domSelector = null)
+        public async Task CrawlAsync(
+            Uri rootUri,
+            int maxPages,
+            int maxDepth,
+            string? domSelector = null,
+            string? contentSelector = null)
         {
             ArgumentNullException.ThrowIfNull(rootUri);
             if (maxPages <= 0) throw new ArgumentException("Must be greater than 0", nameof(maxPages));
             if (maxDepth <= 0) throw new ArgumentException("Must be greater than 0", nameof(maxDepth));
+            _contentSelector = contentSelector;
 
             try
             {

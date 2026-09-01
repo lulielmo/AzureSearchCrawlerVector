@@ -82,7 +82,12 @@ namespace AzureSearchCrawler
             Dispose(false);
         }
 
-        public async Task CrawlAsync(Uri rootUri, int maxPages, int maxDepth, string? domSelector = null)
+        public async Task CrawlAsync(
+            Uri rootUri,
+            int maxPages,
+            int maxDepth,
+            string? domSelector = null,
+            string? contentSelector = null)
         {
             ArgumentNullException.ThrowIfNull(rootUri);
             if (maxPages <= 0) throw new ArgumentException("Must be greater than 0", nameof(maxPages));
@@ -91,10 +96,18 @@ namespace AzureSearchCrawler
             try
             {
                 _console.WriteLine($"Starting headless browser crawl of {rootUri}", LogLevel.Information);
-                _console.WriteLine($"Configuration - Max pages: {maxPages}, Max depth: {maxDepth}, DOM selector: {domSelector ?? "none"}", LogLevel.Debug);
+                _console.WriteLine(
+                    $"Configuration - Max pages: {maxPages}, Max depth: {maxDepth}, " +
+                    $"DOM selector: {domSelector ?? "none"}, Content selector: {contentSelector ?? "none"}",
+                    LogLevel.Debug);
                 if (domSelector != null)
                 {
                     _console.WriteLine($"Using DOM selector filter: {domSelector}", LogLevel.Information);
+                }
+
+                if (contentSelector != null)
+                {
+                    _console.WriteLine($"Using content selector: {contentSelector}", LogLevel.Information);
                 }
 
                 _console.WriteLine("Initializing browser configuration", LogLevel.Information);
@@ -108,7 +121,14 @@ namespace AzureSearchCrawler
                     ["User-Agent"] = "AzureSearchCrawler/1.0"
                 });
 
-                await CrawlPageAsync(browserPage, rootUri.ToString(), maxPages, maxDepth, 0, domSelector);
+                await CrawlPageAsync(
+                    browserPage,
+                    rootUri.ToString(),
+                    maxPages,
+                    maxDepth,
+                    0,
+                    domSelector,
+                    contentSelector);
 
                 _console.WriteLine($"Crawl completed successfully. Processed {_visitedUrls.Count} pages.", LogLevel.Information);
             }
@@ -120,7 +140,14 @@ namespace AzureSearchCrawler
             }
         }
 
-        private async Task CrawlPageAsync(IPage browserPage, string url, int maxPages, int maxDepth, int currentDepth, string? domSelector)
+        private async Task CrawlPageAsync(
+            IPage browserPage,
+            string url,
+            int maxPages,
+            int maxDepth,
+            int currentDepth,
+            string? domSelector,
+            string? contentSelector)
         {
             if (currentDepth > maxDepth)
             {
@@ -185,7 +212,8 @@ namespace AzureSearchCrawler
                     await browserPage.TitleAsync(),
                     content,
                     response.Status,
-                    null);
+                    null,
+                    contentSelector);
 
                 //_queue.Enqueue(crawledPage);
                 await _processor.PageCrawledAsync(crawledPage);
@@ -262,7 +290,7 @@ namespace AzureSearchCrawler
                         ["User-Agent"] = "AzureSearchCrawler/1.0"
                     });
 
-                    await CrawlPageAsync(newPage, link, maxPages, maxDepth, currentDepth + 1, domSelector);
+                    await CrawlPageAsync(newPage, link, maxPages, maxDepth, currentDepth + 1, domSelector, contentSelector);
                     await newPage.CloseAsync();
                 }
             }

@@ -24,6 +24,7 @@ namespace AzureSearchCrawler
         private readonly Func<CrawlConfiguration, IWebCrawler> _webCrawlerFactory;
         private readonly IConsole _console;
         private string? _domSelector;
+        private string? _contentSelector;
         private IWebCrawler? _crawler;
 
         public AbotCrawler(ICrawledPageProcessor processor, IConsole console, string? domSelector = null)
@@ -43,7 +44,12 @@ namespace AzureSearchCrawler
             }
         }
 
-        public async Task CrawlAsync(Uri rootUri, int maxPages, int maxDepth, string? domSelector = null)
+        public async Task CrawlAsync(
+            Uri rootUri,
+            int maxPages,
+            int maxDepth,
+            string? domSelector = null,
+            string? contentSelector = null)
         {
             if (_isDisposed)
             {
@@ -74,6 +80,11 @@ namespace AzureSearchCrawler
                     _domSelector = domSelector;
                 }
 
+                if (contentSelector != null)
+                {
+                    _contentSelector = contentSelector;
+                }
+
                 _crawler = _webCrawlerFactory(config);
 
                 _crawler.PageCrawlStarting += Crawler_ProcessPageCrawlStarting;
@@ -86,6 +97,11 @@ namespace AzureSearchCrawler
                 _console.WriteLine($"Crawl configuration: Max pages={maxPages}, Max depth={maxDepth}, Concurrent threads={config.MaxConcurrentThreads}", LogLevel.Information);
                 _console.WriteLine($"Performance settings: Timeout={config.CrawlTimeoutSeconds}s, Delay between requests={config.MinCrawlDelayPerDomainMilliSeconds}ms", LogLevel.Debug);
                 _console.WriteLine($"Request configuration: User-Agent='{config.UserAgentString}'", LogLevel.Debug);
+
+                if (_contentSelector != null)
+                {
+                    _console.WriteLine($"Using content selector: {_contentSelector}", LogLevel.Information);
+                }
                 
                 if (_domSelector != null)
                 {
@@ -247,12 +263,19 @@ namespace AzureSearchCrawler
 
                 try
                 {
+                    var html = e.CrawledPage.Content?.Text;
+                    if (string.IsNullOrWhiteSpace(html))
+                    {
+                        html = e.CrawledPage.AngleSharpHtmlDocument?.DocumentElement?.OuterHtml ?? string.Empty;
+                    }
+
                     var crawledWebPage = new CrawledWebPage(
                         e.CrawledPage.Uri,
                         e.CrawledPage.AngleSharpHtmlDocument?.QuerySelector("title")?.TextContent ?? string.Empty,
-                        e.CrawledPage.AngleSharpHtmlDocument?.Body?.TextContent ?? string.Empty,
+                        html,
                         (int)e.CrawledPage.HttpResponseMessage.StatusCode,
-                        null);
+                        null,
+                        _contentSelector);
 
                     await _processor.PageCrawledAsync(crawledWebPage);
                     tcs.TrySetResult();

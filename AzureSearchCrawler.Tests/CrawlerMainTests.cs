@@ -87,14 +87,65 @@ namespace AzureSearchCrawler.Tests
                 "--azureOpenAIEmbeddingDimensions", "3072"
             };
             var testConsole = new TestConsole();
-            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
+            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
 
             // Act
             var result = await _crawlerMain.RunAsync(args, testConsole);
 
             // Assert
             Assert.Equal(0, result);
-            _crawlerMock.Verify(c => c.CrawlAsync(new Uri("http://example.com"), 100, 10, null), Times.Once);
+            _crawlerMock.Verify(c => c.CrawlAsync(new Uri("http://example.com"), 100, 10, null, null), Times.Once);
+        }
+
+        [Fact]
+        public async Task RunAsync_WithEnableOcr_CompletesSuccessfully()
+        {
+            var args = new[]
+            {
+                "--rootUri", "http://example.com",
+                "--serviceEndPoint", "https://test.search.windows.net",
+                "--indexName", "test-index",
+                "--adminApiKey", "test-key",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072",
+                "--enableOcr",
+                "--ocrLanguage", "swe+eng",
+                "--ocrTextThreshold", "150"
+            };
+            var testConsole = new TestConsole();
+            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>()))
+                .Returns(Task.CompletedTask);
+
+            var result = await _crawlerMain.RunAsync(args, testConsole);
+
+            Assert.Equal(0, result);
+        }
+
+        [Fact]
+        public async Task RunAsync_WithOcrPreview_CompletesSuccessfully()
+        {
+            var args = new[]
+            {
+                "--rootUri", "http://example.com",
+                "--serviceEndPoint", "https://test.search.windows.net",
+                "--indexName", "test-index",
+                "--adminApiKey", "test-key",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072",
+                "--ocrPreview",
+                "--ocrTextThreshold", "150"
+            };
+            var testConsole = new TestConsole();
+            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>()))
+                .Returns(Task.CompletedTask);
+
+            var result = await _crawlerMain.RunAsync(args, testConsole);
+
+            Assert.Equal(0, result);
         }
 
         [Fact]
@@ -178,7 +229,7 @@ namespace AzureSearchCrawler.Tests
                 "--embeddingDeploymentName", "ai-deployment",
                 "--azureOpenAIEmbeddingDimensions", "3072"
             };
-            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
+            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
 
             // Act
             var result = await _crawlerMain.RunAsync(args, testConsole);
@@ -232,7 +283,7 @@ namespace AzureSearchCrawler.Tests
                 "--embeddingDeploymentName", "ai-deployment",
                 "--azureOpenAIEmbeddingDimensions", "3072"
             };
-            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
+            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
 
             // Act
             var result = await _crawlerMain.RunAsync(args, new TestConsole());
@@ -264,7 +315,7 @@ namespace AzureSearchCrawler.Tests
                 "--embeddingDeploymentName", "ai-deployment",
                 "--azureOpenAIEmbeddingDimensions", "3072"
             };
-            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
+            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
 
             try
             {
@@ -277,13 +328,15 @@ namespace AzureSearchCrawler.Tests
                     new Uri("http://example.com"),
                     100, // Default
                     3, 
-                    "div.blog-content"),
+                    "div.blog-content",
+                    null),
                     Times.Once);
                 _crawlerMock.Verify(c => c.CrawlAsync(
                     new Uri("http://another-site.com"),
                     100, // Default
                     5, 
-                    "div.articles"),
+                    "div.articles",
+                    null),
                     Times.Once);
             }
             finally
@@ -314,7 +367,7 @@ namespace AzureSearchCrawler.Tests
                 "--embeddingDeploymentName", "ai-deployment",
                 "--azureOpenAIEmbeddingDimensions", "3072"
             };
-            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
+            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
 
             try
             {
@@ -329,6 +382,7 @@ namespace AzureSearchCrawler.Tests
                     It.Is<Uri>(u => u.AbsoluteUri == "http://valid-site.com/"),
                     100, // Default
                     5, 
+                    null,
                     null),
                     Times.Once);
                 
@@ -337,6 +391,7 @@ namespace AzureSearchCrawler.Tests
                     It.Is<Uri>(u => u.OriginalString == "invalid-url"),
                     It.IsAny<int>(), 
                     It.IsAny<int>(), 
+                    It.IsAny<string>(),
                     It.IsAny<string>()), 
                     Times.Never);
             }
@@ -464,7 +519,7 @@ namespace AzureSearchCrawler.Tests
         public async Task RunAsync_WhenUnexpectedErrorOccurs_ReturnsError()
         {
             // Arrange
-            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>()))
+            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>()))
                 .ThrowsAsync(new InvalidOperationException("Unexpected error"));
                 
             var args = new[]
@@ -504,7 +559,7 @@ namespace AzureSearchCrawler.Tests
                 "--embeddingDeploymentName", "ai-deployment",
                 "--azureOpenAIEmbeddingDimensions", "3072"
             };
-            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
+            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
 
             // Act
             var result = await _crawlerMain.RunAsync(args, new TestConsole());
@@ -515,7 +570,8 @@ namespace AzureSearchCrawler.Tests
                 It.IsAny<Uri>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
-                It.Is<string>(s => s == "div.blog-content")),
+                It.Is<string>(s => s == "div.blog-content"),
+                It.IsAny<string?>()),
                 Times.Once);
         }
 
@@ -534,7 +590,7 @@ namespace AzureSearchCrawler.Tests
                 "--embeddingDeploymentName", "ai-deployment",
                 "--azureOpenAIEmbeddingDimensions", "3072"
             };
-            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
+            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
 
             // Act
             var result = await _crawlerMain.RunAsync(args, new TestConsole());
@@ -545,6 +601,7 @@ namespace AzureSearchCrawler.Tests
                 It.IsAny<Uri>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.Is<string?>(s => s == null),
                 It.Is<string?>(s => s == null)),
                 Times.Once);
         }
@@ -571,7 +628,7 @@ namespace AzureSearchCrawler.Tests
                 "--embeddingDeploymentName", "ai-deployment",
                 "--azureOpenAIEmbeddingDimensions", "3072"
             };
-            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
+            _crawlerMock.Setup(c => c.CrawlAsync(It.IsAny<Uri>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>())).Returns(Task.CompletedTask);
 
             try
             {
@@ -584,13 +641,106 @@ namespace AzureSearchCrawler.Tests
                     new Uri("http://example.com"),
                     100,
                     3,
+                    null,
                     null),
                     Times.Once);
                 _crawlerMock.Verify(c => c.CrawlAsync(
                     new Uri("http://another-site.com"),
                     100,
                     5,
+                    null,
                     null),
+                    Times.Once);
+            }
+            finally
+            {
+                File.Delete(tempFile);
+            }
+        }
+
+        [Fact]
+        public async Task RunAsync_WithContentSelector_PassesSelectorToCrawler()
+        {
+            var args = new[]
+            {
+                "--rootUri", "http://example.com",
+                "--serviceEndPoint", "https://test.search.windows.net",
+                "--indexName", "test-index",
+                "--adminApiKey", "test-key",
+                "--contentSelector", "article.guide_article",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
+            };
+            _crawlerMock.Setup(c => c.CrawlAsync(
+                    It.IsAny<Uri>(),
+                    It.IsAny<int>(),
+                    It.IsAny<int>(),
+                    It.IsAny<string?>(),
+                    It.IsAny<string?>()))
+                .Returns(Task.CompletedTask);
+
+            var result = await _crawlerMain.RunAsync(args, new TestConsole());
+
+            Assert.Equal(0, result);
+            _crawlerMock.Verify(c => c.CrawlAsync(
+                It.IsAny<Uri>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<string?>(),
+                It.Is<string>(s => s == "article.guide_article")),
+                Times.Once);
+        }
+
+        [Fact]
+        public async Task RunAsync_WithSitesFileContentSelector_PassesPerSiteSelector()
+        {
+            var testConsole = new TestConsole();
+            var tempFile = Path.GetTempFileName();
+            await File.WriteAllTextAsync(tempFile, @"[
+                {""uri"": ""http://example.com"", ""maxDepth"": 3, ""contentSelector"": ""article.guide_article""},
+                {""uri"": ""http://another-site.com"", ""maxDepth"": 5}
+            ]");
+
+            var args = new[]
+            {
+                "--sitesFile", tempFile,
+                "--contentSelector", "main",
+                "--serviceEndPoint", "https://test.search.windows.net",
+                "--indexName", "test-index",
+                "--adminApiKey", "test-key",
+                "--embeddingEndPoint", "https://test.ai.windows.net",
+                "--embeddingAdminKey", "test-key2",
+                "--embeddingDeploymentName", "ai-deployment",
+                "--azureOpenAIEmbeddingDimensions", "3072"
+            };
+            _crawlerMock.Setup(c => c.CrawlAsync(
+                    It.IsAny<Uri>(),
+                    It.IsAny<int>(),
+                    It.IsAny<int>(),
+                    It.IsAny<string?>(),
+                    It.IsAny<string?>()))
+                .Returns(Task.CompletedTask);
+
+            try
+            {
+                var result = await _crawlerMain.RunAsync(args, testConsole);
+
+                Assert.Equal(0, result);
+                _crawlerMock.Verify(c => c.CrawlAsync(
+                    new Uri("http://example.com"),
+                    100,
+                    3,
+                    null,
+                    "article.guide_article"),
+                    Times.Once);
+                _crawlerMock.Verify(c => c.CrawlAsync(
+                    new Uri("http://another-site.com"),
+                    100,
+                    5,
+                    null,
+                    "main"),
                     Times.Once);
             }
             finally

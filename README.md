@@ -20,8 +20,10 @@ The crawler uses a modern, scalable architecture with the following key componen
 
 ## Processing Flow
 
-1. **Crawling Phase**: Crawlers discover pages and add them to a queue
+1. **Crawling Phase**: Crawlers discover pages and add HTML to a queue
 2. **Processing Phase**: VectorizedPageProcessor processes pages in batches:
+   - Extracts clean text from HTML
+   - Optionally runs local Tesseract OCR when a page has little body text and content images
    - Generates embeddings for titles and content
    - Indexes documents with vector fields
    - Handles rate limiting and error recovery
@@ -69,18 +71,40 @@ Options:
   (REQUIRED)                                                 service
   -aed, --azureOpenAIEmbeddingDimensions                     The dimensions of the embedding
   <azureOpenAIEmbeddingDimensions> (REQUIRED)
-  -dr, --dryRun                                              Test crawling without uploading to index [default: False]
+  -dr, --dryRun                                              Test crawling and link selection without uploading to
+                                                             the index [default: False]
+  --ocrPreview                                               Preview OCR threshold decisions without embeddings or
+                                                             indexing. Add --enableOcr to also run Tesseract
+                                                             [default: False]
   -f, --sitesFile <sitesFile>                                Path to a JSON file containing sites to crawl
   -ds, --domSelector <domSelector>                           DOM selector to limit which links to follow (e.g.
                                                              'div.blog-container div.blog-main')
+  -cs, --contentSelector <contentSelector>                   CSS selector for the main content area to extract text
+                                                             and images from (e.g. 'article.guide_article'). When
+                                                             omitted, the entire body is used
   -v, --verbose                                              Enable verbose output [default: False]
   -cm, --crawlMode <Headless|Sitemap|Standard>               Crawling mode (Standard, Headless or Sitemap) [default:
                                                              Standard]
+  --enableOcr                                                Enable Tesseract OCR fallback for pages with little body
+                                                             text [default: False]
+  --ocrLanguage <ocrLanguage>                                Tesseract language codes (e.g. swe+eng) [default: swe+eng]
+  --ocrTesseractPath <ocrTesseractPath>                      Path to the tesseract executable [default: tesseract]
+  --ocrTessDataPath <ocrTessDataPath>                        Optional path to a tessdata directory
+  --ocrTextThreshold <ocrTextThreshold>                      Run OCR when effective body text is shorter than this many
+                                                             characters [default: 200]
+  --ocrMaxImagesPerPage <ocrMaxImagesPerPage>                Maximum number of content images to OCR on a single page
+                                                             [default: 10]
   --version                                                  Show version information
   -?, -h, --help                                             Show help and usage information
 ```
 > [!TIP]
-> By using the option `-dr, --dryRun` you can test the crawling without sending the extracted information to the Azure AI Search Index.
+> `--dryRun` tests navigation and link selection (`maxDepth`, `domSelector`) without calling Azure.
+> `--contentSelector` limits text and image extraction to a CSS region (for example `article.guide_article`). When omitted, the entire `body` is used. The same value can be set per site in the sites file.
+> `--ocrPreview` tests OCR threshold decisions on crawled pages without embeddings or indexing.
+> Combine `--ocrPreview --enableOcr` to also run Tesseract and see how much text is extracted from images.
+
+> [!NOTE]
+> Use `--enableOcr` when knowledge articles store most of their text inside images. OCR runs only for pages whose extracted body text is below `--ocrTextThreshold` and that contain content-sized images. Tesseract must be installed locally (Swedish language data recommended: `swe+eng`). Tune `--ocrTextThreshold` with `--ocrPreview` before a full indexing run.
 
 > [!NOTE]
 > When using the DOM selector option, the root page of the website will still be crawled even if it doesn't match the selector. This is a known behavior due to how the crawler evaluates links. The DOM selector will effectively filter all other pages based on the specified selector.
@@ -98,7 +122,8 @@ By using the command line switch `-f, --sitesFile <sitesFile>` you can specify a
   {
     "uri": "https://example.com/blog",
     "maxDepth": 3,
-    "domSelector": "div.blog-content"
+    "domSelector": "div.blog-content",
+    "contentSelector": "article"
   },
   {
     "uri": "https://another-site.com",
@@ -135,6 +160,7 @@ The `VectorizedPageProcessor` supports several configuration options:
 - **CrawledPageQueue**: Thread-safe queue for storing crawled pages
 - **VectorizedPageProcessor**: Handles embedding generation and indexing with batch processing
 - **TextExtractor**: Extracts and processes text content from HTML
+- **OcrPageEnricher**: Optional Tesseract OCR fallback for image-heavy pages with little body text
 - **Models**: Data structures for crawled pages and site configuration
 
 ## Key Interfaces
@@ -142,6 +168,8 @@ The `VectorizedPageProcessor` supports several configuration options:
 - `IWebCrawlingStrategy`: Defines crawling behavior
 - `ICrawledPageProcessor`: Defines page processing behavior
 - `IConsole`: Abstraction for logging and output
+- `IOcrEngine`: Abstraction for local OCR (Tesseract by default)
+- `IImageDownloader`: Abstraction for downloading images used by OCR
 
 # Azure Search Crawler
 

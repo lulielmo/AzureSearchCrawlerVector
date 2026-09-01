@@ -33,6 +33,12 @@ namespace AzureSearchCrawler.Models
         public string? ErrorMessage { get; }
 
         /// <summary>
+        /// Optional CSS selector for the main content area used during text extraction.
+        /// When null, the entire body is used.
+        /// </summary>
+        public string? ContentSelector { get; }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="CrawledWebPage"/> class.
         /// </summary>
         /// <param name="uri">The URL of the crawled page.</param>
@@ -40,13 +46,21 @@ namespace AzureSearchCrawler.Models
         /// <param name="content">The content of the page.</param>
         /// <param name="statusCode">The HTTP status code.</param>
         /// <param name="errorMessage">Any error message.</param>
-        public CrawledWebPage(Uri uri, string title, string content, int statusCode, string? errorMessage = null)
+        /// <param name="contentSelector">Optional CSS selector for the main content area.</param>
+        public CrawledWebPage(
+            Uri uri,
+            string title,
+            string content,
+            int statusCode,
+            string? errorMessage = null,
+            string? contentSelector = null)
         {
             Uri = uri ?? throw new ArgumentNullException(nameof(uri));
             Title = title ?? throw new ArgumentNullException(nameof(title));
             Content = content ?? throw new ArgumentNullException(nameof(content));
             StatusCode = statusCode;
             ErrorMessage = errorMessage;
+            ContentSelector = contentSelector;
         }
     }
 } 

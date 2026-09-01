@@ -4,6 +4,7 @@ using Azure.Search.Documents.Models;
 using AzureSearchCrawler.Adapters;
 using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
+using AzureSearchCrawler.Ocr;
 using AzureSearchCrawler.Utils;
 
 namespace AzureSearchCrawler
@@ -27,6 +28,12 @@ namespace AzureSearchCrawler
         private readonly int _batchSize = 10;
         private readonly TimeSpan _rateLimitDelay;
         private readonly bool _dryRun;
+        private readonly bool _ocrPreview;
+        private readonly bool _skipAzure;
+        private readonly TextExtractor _textExtractor;
+        private readonly OcrOptions _ocrOptions;
+        private readonly ThinContentDetector _thinContentDetector;
+        private readonly OcrPageEnricher? _ocrEnricher;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="VectorizedPageProcessor"/> class.
@@ -44,7 +51,12 @@ namespace AzureSearchCrawler
             bool dryRun = false,
             TimeSpan? rateLimitDelay = null,
             IEmbeddingClient? embeddingClient = null,
-            SearchClient? searchClient = null)
+            SearchClient? searchClient = null,
+            TextExtractor? textExtractor = null,
+            OcrOptions? ocrOptions = null,
+            IOcrEngine? ocrEngine = null,
+            IImageDownloader? imageDownloader = null,
+            bool ocrPreview = false)
         {
             _searchServiceEndpoint = searchServiceEndpoint ?? throw new ArgumentNullException(nameof(searchServiceEndpoint));
             _adminApiKey = adminApiKey ?? throw new ArgumentNullException(nameof(adminApiKey));
@@ -56,6 +68,8 @@ namespace AzureSearchCrawler
             _console = console ?? throw new ArgumentNullException(nameof(console));
             _queue = queue ?? throw new ArgumentNullException(nameof(queue));
             _dryRun = dryRun;
+            _ocrPreview = ocrPreview;
+            _skipAzure = dryRun || ocrPreview;
             _rateLimitDelay = rateLimitDelay ?? TimeSpan.FromSeconds(4);
             _embeddingClient = embeddingClient ?? new OpenAIEmbeddingClientAdapter(
                 new AzureOpenAIClient(
@@ -63,6 +77,18 @@ namespace AzureSearchCrawler
                     new Azure.AzureKeyCredential(_embeddingAiAdminApiKey)),
                 _embeddingDeployment);
             _searchClient = searchClient;
+            _textExtractor = textExtractor ?? new TextExtractor();
+            _ocrOptions = ocrOptions ?? OcrOptions.Disabled;
+            _thinContentDetector = new ThinContentDetector();
+            if (_ocrOptions.Enabled)
+            {
+                _ocrEnricher = new OcrPageEnricher(
+                    ocrEngine ?? new TesseractOcrEngine(_ocrOptions),
+                    imageDownloader ?? new HttpImageDownloader(),
+                    _console,
+                    _ocrOptions,
+                    _thinContentDetector);
+            }
         }
 
         /// <summary>
@@ -102,7 +128,13 @@ namespace AzureSearchCrawler
         /// <returns>A task representing the asynchronous operation.</returns>
         public async Task ProcessQueueAsync(CancellationToken cancellationToken = default)
         {
-            if (_dryRun)
+            if (_ocrPreview)
+            {
+                _console.WriteLine(
+                    "Starting OCR preview (no embeddings or indexing)...",
+                    LogLevel.Information);
+            }
+            else if (_dryRun)
             {
                 _console.WriteLine("Starting to process crawled pages in DRY RUN mode...", LogLevel.Information);
             }
@@ -113,7 +145,7 @@ namespace AzureSearchCrawler
 
             try
             {
-                if (!_dryRun)
+                if (!_skipAzure)
                 {
                     await InitializeClientsAsync();
                 }
@@ -143,7 +175,11 @@ namespace AzureSearchCrawler
                     await ProcessBatchAsync(batch, cancellationToken);
                 }
 
-                if (_dryRun)
+                if (_ocrPreview)
+                {
+                    _console.WriteLine("Finished OCR preview.", LogLevel.Information);
+                }
+                else if (_dryRun)
                 {
                     _console.WriteLine("Finished processing crawled pages in DRY RUN mode.", LogLevel.Information);
                 }
@@ -186,6 +222,12 @@ namespace AzureSearchCrawler
 
         private async Task ProcessBatchAsync(List<CrawledWebPage> batch, CancellationToken cancellationToken)
         {
+            if (_ocrPreview)
+            {
+                await PreviewOcrBatchAsync(batch, cancellationToken);
+                return;
+            }
+
             if (_dryRun)
             {
                 _console.WriteLine($"[DRY RUN] Would process batch of {batch.Count} pages...", LogLevel.Information);
@@ -209,71 +251,71 @@ namespace AzureSearchCrawler
 
                 foreach (var pageGroup in pageGroups)
                 {
-                    // Förbered titlar och innehåll för denna grupp
-                    var texts = new List<string>();
-                    var pageIndices = new List<int>();
-                    
+                    var preparedPages = new List<(CrawledWebPage Page, string Title, string Content)>();
                     foreach (var page in pageGroup)
                     {
-                        // Ersätt tomma titlar med ett bindestreck
-                        var title = string.IsNullOrWhiteSpace(page.Title) ? "-" : page.Title;
-                        if (title != page.Title)
+                        var (title, content) = await PreparePageContentAsync(page, cancellationToken);
+                        preparedPages.Add((page, title, content));
+                    }
+
+                    var texts = new List<string>();
+                    const int maxLength = 8000;
+                    var truncatedPages = new List<(CrawledWebPage Page, string Title, string Content)>();
+
+                    foreach (var prepared in preparedPages)
+                    {
+                        var title = string.IsNullOrWhiteSpace(prepared.Title) ? "-" : prepared.Title;
+                        if (title != prepared.Title)
                         {
-                            _console.WriteLine($"Empty title found for {page.Uri}, replacing with '-'", LogLevel.Warning);
+                            _console.WriteLine($"Empty title found for {prepared.Page.Uri}, replacing with '-'", LogLevel.Warning);
                         }
 
-                        // Verifiera att innehållet inte är tomt (bör inte hända)
-                        if (string.IsNullOrWhiteSpace(page.Content))
+                        if (string.IsNullOrWhiteSpace(prepared.Content))
                         {
-                            _console.WriteLine($"Warning: Empty content found for {page.Uri}, this should have been filtered out earlier", LogLevel.Warning);
+                            _console.WriteLine(
+                                $"Warning: Empty content found for {prepared.Page.Uri}, this should have been filtered out earlier",
+                                LogLevel.Warning);
                         }
 
-                        // Truncate text to max 8000 characters to be safe (well below 8192 token limit)
-                        const int maxLength = 8000;
-                        var truncatedContent = page.Content.Length > maxLength ? page.Content[..maxLength] : page.Content;
+                        var truncatedContent = prepared.Content.Length > maxLength
+                            ? prepared.Content[..maxLength]
+                            : prepared.Content;
                         var truncatedTitle = title.Length > maxLength ? title[..maxLength] : title;
 
-                        if (page.Content.Length > maxLength)
+                        if (prepared.Content.Length > maxLength)
                         {
-                            _console.WriteLine($"Truncated content for {page.Uri}: {page.Content.Length} -> {truncatedContent.Length} chars", LogLevel.Debug);
+                            _console.WriteLine(
+                                $"Truncated content for {prepared.Page.Uri}: {prepared.Content.Length} -> {truncatedContent.Length} chars",
+                                LogLevel.Debug);
                         }
                         if (title.Length > maxLength)
                         {
-                            _console.WriteLine($"Truncated title for {page.Uri}: {title.Length} -> {truncatedTitle.Length} chars", LogLevel.Debug);
+                            _console.WriteLine(
+                                $"Truncated title for {prepared.Page.Uri}: {title.Length} -> {truncatedTitle.Length} chars",
+                                LogLevel.Debug);
                         }
 
                         texts.Add(truncatedTitle);
                         texts.Add(truncatedContent);
-                        pageIndices.Add(pageGroup.IndexOf(page));
+                        truncatedPages.Add((prepared.Page, truncatedTitle, truncatedContent));
                     }
 
-                    // Generera embeddings för gruppen
                     _console.WriteLine($"Generating embeddings for group of {pageGroup.Count} pages...", LogLevel.Debug);
                     var embeddings = await GenerateEmbeddingsAsync(texts, cancellationToken);
                     _console.WriteLine($"Successfully generated {embeddings.Count} embeddings.", LogLevel.Information);
 
-                    // Skapa sökdokument för denna grupp
                     var documents = new List<SearchDocument>();
-                    for (int i = 0; i < pageGroup.Count; i++)
+                    for (int i = 0; i < truncatedPages.Count; i++)
                     {
-                        var page = pageGroup[i];
-                        var titleEmbedding = embeddings[i * 2];
-                        var contentEmbedding = embeddings[i * 2 + 1];
-
-                        // Använd samma trunkering som för embedding
-                        const int maxLength = 8000;
-                        var title = string.IsNullOrWhiteSpace(page.Title) ? "-" : page.Title;
-                        var truncatedContent = page.Content.Length > maxLength ? page.Content[..maxLength] : page.Content;
-                        var truncatedTitle = title.Length > maxLength ? title[..maxLength] : title;
-
+                        var prepared = truncatedPages[i];
                         var document = new SearchDocument
                         {
-                            ["id"] = HashUtils.CreateSHA512(page.Uri.ToString()),
-                            ["url"] = page.Uri.ToString(),
-                            ["title"] = truncatedTitle,
-                            ["content"] = truncatedContent,
-                            ["title_vector"] = titleEmbedding,
-                            ["content_vector"] = contentEmbedding
+                            ["id"] = HashUtils.CreateSHA512(prepared.Page.Uri.ToString()),
+                            ["url"] = prepared.Page.Uri.ToString(),
+                            ["title"] = prepared.Title,
+                            ["content"] = prepared.Content,
+                            ["title_vector"] = embeddings[i * 2],
+                            ["content_vector"] = embeddings[i * 2 + 1]
                         };
                         documents.Add(document);
                     }
@@ -304,6 +346,95 @@ namespace AzureSearchCrawler
                 _console.WriteLine($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
                 throw;
             }
+        }
+
+        private async Task PreviewOcrBatchAsync(List<CrawledWebPage> batch, CancellationToken cancellationToken)
+        {
+            _console.WriteLine($"[OCR PREVIEW] Evaluating {batch.Count} pages...", LogLevel.Information);
+
+            foreach (var page in batch)
+            {
+                var extracted = _textExtractor.ExtractPage(page.Content, page.Uri, page.ContentSelector);
+                var contentImages = _thinContentDetector.SelectContentImages(
+                    extracted.Images,
+                    _ocrOptions.MaxImagesPerPage);
+                var wouldRunOcr = _thinContentDetector.ShouldUseOcr(
+                    extracted.EffectiveBodyText,
+                    contentImages,
+                    _ocrOptions.TextThreshold);
+
+                var decision = wouldRunOcr
+                    ? "would run OCR"
+                    : contentImages.Count == 0
+                        ? "skip OCR (no content images)"
+                        : "skip OCR (body text at or above threshold)";
+
+                _console.WriteLine($"[OCR PREVIEW] {page.Uri}", LogLevel.Information);
+                _console.WriteLine(
+                    $"[OCR PREVIEW]   Content selector: {extracted.ContentScope}",
+                    LogLevel.Information);
+                _console.WriteLine(
+                    $"[OCR PREVIEW]   Effective body text: {extracted.EffectiveBodyText.Length} chars " +
+                    $"(threshold: {_ocrOptions.TextThreshold})",
+                    LogLevel.Information);
+                _console.WriteLine(
+                    $"[OCR PREVIEW]   Sample: {FormatPreviewSample(extracted.EffectiveBodyText)}",
+                    LogLevel.Information);
+                _console.WriteLine(
+                    $"[OCR PREVIEW]   Content images: {contentImages.Count} " +
+                    $"(of {extracted.Images.Count} total, max {_ocrOptions.MaxImagesPerPage})",
+                    LogLevel.Information);
+                _console.WriteLine($"[OCR PREVIEW]   Decision: {decision}", LogLevel.Information);
+
+                if (!wouldRunOcr)
+                {
+                    continue;
+                }
+
+                if (_ocrEnricher == null)
+                {
+                    _console.WriteLine(
+                        "[OCR PREVIEW]   Tesseract not run (add --enableOcr to extract image text)",
+                        LogLevel.Information);
+                    continue;
+                }
+
+                var enriched = await _ocrEnricher.EnrichAsync(extracted, page.Uri, cancellationToken);
+                _console.WriteLine(
+                    $"[OCR PREVIEW]   Prepared content: {enriched.Length} chars after OCR",
+                    LogLevel.Information);
+            }
+        }
+
+        private async Task<(string Title, string Content)> PreparePageContentAsync(
+            CrawledWebPage page,
+            CancellationToken cancellationToken)
+        {
+            var extracted = _textExtractor.ExtractPage(page.Content, page.Uri, page.ContentSelector);
+            var title = string.IsNullOrWhiteSpace(page.Title) ? extracted.Title : page.Title;
+
+            if (_ocrEnricher != null)
+            {
+                var content = await _ocrEnricher.EnrichAsync(extracted, page.Uri, cancellationToken);
+                return (title, content);
+            }
+
+            return (title, extracted.Text);
+        }
+
+        private static string FormatPreviewSample(string text, int maxLength = 160)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return "(empty)";
+            }
+
+            if (text.Length <= maxLength)
+            {
+                return text;
+            }
+
+            return text[..maxLength] + "...";
         }
 
         private async Task<List<float[]>> GenerateEmbeddingsAsync(List<string> texts, CancellationToken cancellationToken)
