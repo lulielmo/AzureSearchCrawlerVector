@@ -57,7 +57,7 @@ namespace AzureSearchCrawler.Ocr
                 return false;
             }
 
-            var src = image.Src ?? string.Empty;
+            var src = image.Src;
             if (src.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
             {
                 return false;

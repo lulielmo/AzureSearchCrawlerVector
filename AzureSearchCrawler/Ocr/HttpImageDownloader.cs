@@ -5,19 +5,29 @@ namespace AzureSearchCrawler.Ocr
     /// <summary>
     /// Downloads images over HTTP(S) into a memory stream for OCR.
     /// </summary>
-    public class HttpImageDownloader : IImageDownloader
+    public sealed class HttpImageDownloader : IImageDownloader
     {
         private const long MaxBytes = 20 * 1024 * 1024;
+        private static readonly HttpClient SharedHttpClient = CreateSharedHttpClient();
         private readonly HttpClient _httpClient;
 
         public HttpImageDownloader(HttpClient? httpClient = null)
         {
-            _httpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+            _httpClient = httpClient ?? SharedHttpClient;
+
             if (_httpClient.DefaultRequestHeaders.UserAgent.Count == 0)
             {
                 _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(
                     "Mozilla/5.0 (compatible; AzureSearchCrawler/1.0)");
             }
+        }
+
+        private static HttpClient CreateSharedHttpClient()
+        {
+            var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "Mozilla/5.0 (compatible; AzureSearchCrawler/1.0)");
+            return client;
         }
 
         public async Task<Stream?> DownloadAsync(Uri imageUri, CancellationToken cancellationToken = default)
@@ -52,6 +62,7 @@ namespace AzureSearchCrawler.Ocr
 
             if (memory.Length == 0 || memory.Length > MaxBytes)
             {
+                await memory.DisposeAsync();
                 return null;
             }
 
