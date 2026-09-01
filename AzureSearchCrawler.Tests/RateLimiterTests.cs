@@ -17,6 +17,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using Xunit;
+using System.Threading;
+using AzureSearchCrawler.TestUtilities;
 
 namespace AzureSearchCrawler.Tests
 {
@@ -118,6 +120,73 @@ namespace AzureSearchCrawler.Tests
 
             // Assert
             Assert.True(stopwatch.ElapsedMilliseconds < 100); // Should return almost immediately
+        }
+
+        [Fact]
+        public async Task WaitAsync_Timeout_ThrowsTimeoutExceptionAndLogsWarning()
+        {
+            // Arrange
+            var console = new TestConsole();
+            var testSemaphore = new SemaphoreSlim(0, 1);
+            var rateLimiter = new RateLimiter(TimeSpan.FromMilliseconds(1), true, console, testSemaphore, TimeSpan.FromMilliseconds(10));
+            var cts = new CancellationTokenSource();
+
+            // Act & Assert
+            var ex = await Assert.ThrowsAsync<TimeoutException>(() =>
+                rateLimiter.WaitAsync(cts.Token)
+            );
+            Assert.Contains("Failed to acquire rate limiter semaphore within timeout", ex.Message);
+            Assert.Contains(console.Output, line => line.Contains("Failed to acquire semaphore within timeout"));
+        }
+
+        [Fact]
+        public async Task WaitAsync_WhenCancelled_ThrowsOperationCanceledExceptionAndLogsWarning()
+        {
+            // Arrange
+            var console = new TestConsole();
+            var testSemaphore = new SemaphoreSlim(0, 1); // No available space
+            var rateLimiter = new RateLimiter(TimeSpan.FromSeconds(1), true, console, testSemaphore);
+            var cts = new CancellationTokenSource();
+
+            // Start the wait in a separate task
+            var waitTask = rateLimiter.WaitAsync(cts.Token);
+
+            // Cancel token after a short while
+            cts.CancelAfter(10);
+
+            // Act & Assert
+            var ex = await Assert.ThrowsAsync<OperationCanceledException>(() => waitTask);
+            Assert.Contains(console.Output, line => line.Contains("Rate limiter operation was cancelled"));
+        }
+
+        [Fact]
+        public async Task WaitAsync_WhenDelayCancelled_ThrowsOperationCanceledExceptionAndLogsWarning()
+        {
+            // Arrange
+            var console = new TestConsole();
+            var rateLimiter = new RateLimiter(TimeSpan.FromSeconds(1), true, console);
+            var cts = new CancellationTokenSource();
+
+            // First call goes through directly
+            await rateLimiter.WaitAsync();
+
+            // Start the wait in a separate task (now we're in the delay)
+            var waitTask = rateLimiter.WaitAsync(cts.Token);
+
+            // Cancel token during delay
+            cts.CancelAfter(10);
+
+            // Act & Assert
+            var ex = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => waitTask);
+            Assert.Contains(console.Output, line => line.Contains("Rate limit delay was cancelled"));
+        }
+
+        [Fact]
+        public void Dispose_CanBeCalledMultipleTimes()
+        {
+            var limiter = new RateLimiter(TimeSpan.FromSeconds(1));
+            limiter.Dispose();
+            limiter.Dispose(); // Should not throw
         }
     }
 } 

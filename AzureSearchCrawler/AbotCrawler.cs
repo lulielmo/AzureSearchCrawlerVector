@@ -24,6 +24,7 @@ namespace AzureSearchCrawler
         private readonly Func<CrawlConfiguration, IWebCrawler> _webCrawlerFactory;
         private readonly IConsole _console;
         private string? _domSelector;
+        private string? _contentSelector;
         private IWebCrawler? _crawler;
 
         public AbotCrawler(ICrawledPageProcessor processor, IConsole console, string? domSelector = null)
@@ -43,7 +44,12 @@ namespace AzureSearchCrawler
             }
         }
 
-        public async Task CrawlAsync(Uri rootUri, int maxPages, int maxDepth, string? domSelector = null)
+        public async Task CrawlAsync(
+            Uri rootUri,
+            int maxPages,
+            int maxDepth,
+            string? domSelector = null,
+            string? contentSelector = null)
         {
             if (_isDisposed)
             {
@@ -74,6 +80,11 @@ namespace AzureSearchCrawler
                     _domSelector = domSelector;
                 }
 
+                if (contentSelector != null)
+                {
+                    _contentSelector = contentSelector;
+                }
+
                 _crawler = _webCrawlerFactory(config);
 
                 _crawler.PageCrawlStarting += Crawler_ProcessPageCrawlStarting;
@@ -86,6 +97,11 @@ namespace AzureSearchCrawler
                 _console.WriteLine($"Crawl configuration: Max pages={maxPages}, Max depth={maxDepth}, Concurrent threads={config.MaxConcurrentThreads}", LogLevel.Information);
                 _console.WriteLine($"Performance settings: Timeout={config.CrawlTimeoutSeconds}s, Delay between requests={config.MinCrawlDelayPerDomainMilliSeconds}ms", LogLevel.Debug);
                 _console.WriteLine($"Request configuration: User-Agent='{config.UserAgentString}'", LogLevel.Debug);
+
+                if (_contentSelector != null)
+                {
+                    _console.WriteLine($"Using content selector: {_contentSelector}", LogLevel.Information);
+                }
                 
                 if (_domSelector != null)
                 {
@@ -173,7 +189,7 @@ namespace AzureSearchCrawler
                     throw error;
                 }
 
-                if (result.ErrorOccurred)
+                if (result.ErrorOccurred || result.ErrorException != null)
                 {
                     if (result.ErrorException != null)
                     {
@@ -189,19 +205,18 @@ namespace AzureSearchCrawler
                 }
                 else
                 {
+                    //_console.WriteLine($"Crawl completed successfully. Processed {_pageCount} pages.", LogLevel.Information);
                     _console.WriteLine($"Crawl completed successfully: {_pageCount} pages processed in {duration.TotalSeconds:F2} seconds", LogLevel.Information);
                 }
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex)
             {
-                _console.WriteLine($"Crawl failed with critical error: {ex.Message}", LogLevel.Error);
-                _console.WriteLine($"Stack trace: {ex.StackTrace}", LogLevel.Debug);
+                _console.WriteLine($"Critical error during crawl: {ex.Message}", LogLevel.Error);
+                _console.WriteLine($"Technical details: {ex}", LogLevel.Debug);
                 throw;
             }
             finally
             {
-                await _processor.CrawlFinishedAsync();
-                
                 lock (_lock)
                 {
                     if (_crawler != null)
@@ -248,7 +263,21 @@ namespace AzureSearchCrawler
 
                 try
                 {
-                    await _processor.PageCrawledAsync(e.CrawledPage);
+                    var html = e.CrawledPage.Content?.Text;
+                    if (string.IsNullOrWhiteSpace(html))
+                    {
+                        html = e.CrawledPage.AngleSharpHtmlDocument?.DocumentElement?.OuterHtml ?? string.Empty;
+                    }
+
+                    var crawledWebPage = new CrawledWebPage(
+                        e.CrawledPage.Uri,
+                        e.CrawledPage.AngleSharpHtmlDocument?.QuerySelector("title")?.TextContent ?? string.Empty,
+                        html,
+                        (int)e.CrawledPage.HttpResponseMessage.StatusCode,
+                        null,
+                        _contentSelector);
+
+                    await _processor.PageCrawledAsync(crawledWebPage);
                     tcs.TrySetResult();
                 }
                 catch (Exception ex)

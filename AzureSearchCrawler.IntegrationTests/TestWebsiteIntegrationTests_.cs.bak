@@ -1,0 +1,147 @@
+using AzureSearchCrawler.Interfaces;
+using AzureSearchCrawler.Models;
+using AzureSearchCrawler.Tests.Integration.Fixtures;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Xunit;
+
+namespace AzureSearchCrawler.Tests.Integration
+{
+    public class TestWebsiteIntegrationTests : IClassFixture<TestWebServer>
+    {
+        private readonly TestWebServer _server;
+        private readonly Mock<IConsole> _consoleMock;
+        private readonly Mock<ICrawledPageProcessor> _processorMock;
+        private readonly Mock<ILogger<TestWebsiteIntegrationTests>> _loggerMock;
+
+        public TestWebsiteIntegrationTests(TestWebServer server)
+        {
+            _server = server;
+            _consoleMock = new Mock<IConsole>();
+            _processorMock = new Mock<ICrawledPageProcessor>();
+            _loggerMock = new Mock<ILogger<TestWebsiteIntegrationTests>>();
+
+            // Setup default console behavior
+            _consoleMock.Setup(x => x.WriteLine(It.IsAny<string>(), It.IsAny<LogLevel>()))
+                .Callback<string, LogLevel>((msg, level) => _loggerMock.Object.Log(level, msg));
+        }
+
+        [Fact]
+        public async Task CrawlAsync_WithValidUrl_ProcessesPages()
+        {
+            // Arrange
+            var crawler = new HeadlessBrowserCrawler(_processorMock.Object, _consoleMock.Object);
+            var url = new Uri(_server.BaseUrl);
+
+            // Act
+            await crawler.CrawlAsync(url, maxPages: 10, maxDepth: 2);
+
+            // Assert
+            _processorMock.Verify(x => x.PageCrawledAsync(It.IsAny<CrawledPage>()), Times.AtLeastOnce);
+            _processorMock.Verify(x => x.CrawlFinishedAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task CrawlAsync_WithMaxPages_RespectsLimit()
+        {
+            // Arrange
+            var crawler = new HeadlessBrowserCrawler(_processorMock.Object, _consoleMock.Object);
+            var url = new Uri(_server.BaseUrl);
+            var maxPages = 5;
+
+            // Act
+            await crawler.CrawlAsync(url, maxPages, maxDepth: 2);
+
+            // Assert
+            _processorMock.Verify(x => x.PageCrawledAsync(It.IsAny<CrawledPage>()), Times.AtMost(maxPages));
+            _processorMock.Verify(x => x.CrawlFinishedAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task CrawlAsync_WithMaxDepth_RespectsLimit()
+        {
+            // Arrange
+            var crawler = new HeadlessBrowserCrawler(_processorMock.Object, _consoleMock.Object);
+            var url = new Uri(_server.BaseUrl);
+            var maxDepth = 1;
+
+            // Act
+            await crawler.CrawlAsync(url, maxPages: 10, maxDepth);
+
+            // Assert
+            _processorMock.Verify(x => x.PageCrawledAsync(It.IsAny<CrawledPage>()), Times.AtLeastOnce);
+            _processorMock.Verify(x => x.CrawlFinishedAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task CrawlAsync_WithDomSelector_OnlyProcessesMatchingPages()
+        {
+            // Arrange
+            var crawler = new HeadlessBrowserCrawler(_processorMock.Object, _consoleMock.Object);
+            var url = new Uri(_server.BaseUrl);
+            var domSelector = ".content";
+
+            // Act
+            await crawler.CrawlAsync(url, maxPages: 10, maxDepth: 2, domSelector);
+
+            // Assert
+            _processorMock.Verify(x => x.PageCrawledAsync(It.IsAny<CrawledPage>()), Times.AtLeastOnce);
+            _processorMock.Verify(x => x.CrawlFinishedAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task CrawlAsync_WithInvalidUrl_LogsError()
+        {
+            // Arrange
+            var crawler = new HeadlessBrowserCrawler(_processorMock.Object, _consoleMock.Object);
+            var url = new Uri("http://invalid-url-that-does-not-exist.com");
+
+            // Act & Assert
+            await Assert.ThrowsAsync<Exception>(() => crawler.CrawlAsync(url, maxPages: 10, maxDepth: 2));
+            _consoleMock.Verify(x => x.WriteLine(It.Is<string>(s => s.Contains("Error")), LogLevel.Error), Times.AtLeastOnce);
+        }
+
+        [Fact]
+        public async Task CrawlAsync_WithSitemap_ProcessesAllPages()
+        {
+            // Arrange
+            var crawler = new SitemapCrawler(_processorMock.Object, _consoleMock.Object);
+            var url = new Uri(_server.BaseUrl);
+
+            // Act
+            await crawler.CrawlAsync(url, maxPages: 10, maxDepth: 2);
+
+            // Assert
+            _processorMock.Verify(x => x.PageCrawledAsync(It.IsAny<CrawledPage>()), Times.AtLeastOnce);
+            _processorMock.Verify(x => x.CrawlFinishedAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task CrawlAsync_WithSitemapAndMaxPages_RespectsLimit()
+        {
+            // Arrange
+            var crawler = new SitemapCrawler(_processorMock.Object, _consoleMock.Object);
+            var url = new Uri(_server.BaseUrl);
+            var maxPages = 5;
+
+            // Act
+            await crawler.CrawlAsync(url, maxPages, maxDepth: 2);
+
+            // Assert
+            _processorMock.Verify(x => x.PageCrawledAsync(It.IsAny<CrawledPage>()), Times.AtMost(maxPages));
+            _processorMock.Verify(x => x.CrawlFinishedAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task CrawlAsync_WithSitemapAndInvalidUrl_LogsError()
+        {
+            // Arrange
+            var crawler = new SitemapCrawler(_processorMock.Object, _consoleMock.Object);
+            var url = new Uri("http://invalid-url-that-does-not-exist.com");
+
+            // Act & Assert
+            await Assert.ThrowsAsync<Exception>(() => crawler.CrawlAsync(url, maxPages: 10, maxDepth: 2));
+            _consoleMock.Verify(x => x.WriteLine(It.Is<string>(s => s.Contains("Error")), LogLevel.Error), Times.AtLeastOnce);
+        }
+    }
+} 

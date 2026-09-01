@@ -244,5 +244,130 @@ namespace AzureSearchCrawler.Tests
             // Assert
             Assert.Equal("Clean content without script tags", result["content"]);
         }
+
+        [Fact]
+        public void ExtractPage_WhenPlainText_ReturnsContentAsIs()
+        {
+            var result = _extractor.ExtractPage("Just plain content");
+
+            Assert.Equal("Just plain content", result.Text);
+            Assert.Empty(result.Images);
+        }
+
+        [Fact]
+        public void ExtractPage_WhenHtmlWithImageAndUrlOnly_HasThinEffectiveBodyText()
+        {
+            var html = """
+                <html><body>
+                <p><a href="https://app.bwz.se/item">https://app.bwz.se/item</a></p>
+                <img src="https://example.com/uploaded/image.png" width="540" alt="" />
+                </body></html>
+                """;
+
+            var result = _extractor.ExtractPage(html, new Uri("https://example.com/article"));
+
+            Assert.True(result.EffectiveBodyText.Length < 200);
+            Assert.DoesNotContain("https://", result.EffectiveBodyText, StringComparison.OrdinalIgnoreCase);
+            Assert.Single(result.Images);
+            Assert.Equal("https://example.com/uploaded/image.png", result.Images[0].Src);
+            Assert.Equal(540, result.Images[0].Width);
+        }
+
+        [Fact]
+        public void ExtractPage_ResolvesRelativeImageUrls()
+        {
+            var html = "<html><body><img src=\"/uploaded/image.png\" width=\"400\" /></body></html>";
+
+            var result = _extractor.ExtractPage(html, new Uri("https://example.com/guides/page"));
+
+            Assert.Single(result.Images);
+            Assert.Equal("https://example.com/uploaded/image.png", result.Images[0].AbsoluteUri?.ToString());
+        }
+
+        [Fact]
+        public void ExtractPage_IncludesAltTextInContent()
+        {
+            var html = "<html><body><p>Intro</p><img src=\"https://example.com/a.png\" alt=\"Dam at Finnforsen\" /></body></html>";
+
+            var result = _extractor.ExtractPage(html);
+
+            Assert.Contains("Intro", result.Text);
+            Assert.Contains("Dam at Finnforsen", result.Text);
+        }
+
+        [Fact]
+        public void ExtractPage_WhenHtml_StripsScriptsFromIndexedText()
+        {
+            var html = "<html><body><p>Article</p><script>alert('x')</script></body></html>";
+
+            var result = _extractor.ExtractPage(html);
+
+            Assert.Equal("Article", result.Text);
+        }
+
+        [Fact]
+        public void ExtractPage_IgnoresSiteChrome_WhenArticleHasLittleText()
+        {
+            var html = """
+                <html><body>
+                <nav>Start Aktuellt Kunskapsbank Fakturor Elavtal Kontakt</nav>
+                <article class="guide_article">
+                  <h1>2026-06-25 Utskick företagskunder</h1>
+                  <div class="guide_updated">Uppdaterad 2026-06-24</div>
+                  <div class="guide_text">
+                    <p><a href="https://app.bwz.se/item">https://app.bwz.se/item</a></p>
+                    <img src="https://example.com/uploaded/newsletter.png" width="540" />
+                  </div>
+                </article>
+                <footer>Cookies Personuppgifter Öppettider Kundservice lång sidfotstext</footer>
+                </body></html>
+                """;
+
+            var result = _extractor.ExtractPage(html, new Uri("https://example.com/guide"), "article.guide_article");
+
+            Assert.DoesNotContain("Kunskapsbank", result.EffectiveBodyText);
+            Assert.DoesNotContain("Personuppgifter", result.EffectiveBodyText);
+            Assert.Contains("Utskick företagskunder", result.EffectiveBodyText);
+            Assert.True(result.EffectiveBodyText.Length < 200);
+            Assert.Equal("article.guide_article", result.ContentScope);
+            Assert.Single(result.Images);
+            Assert.Equal("https://example.com/uploaded/newsletter.png", result.Images[0].Src);
+        }
+
+        [Fact]
+        public void ExtractPage_DoesNotCountNavigationImages()
+        {
+            var html = """
+                <html><body>
+                <nav><img src="https://example.com/logo.png" width="200" height="80" /></nav>
+                <article>
+                  <img src="https://example.com/newsletter.png" width="540" />
+                </article>
+                </body></html>
+                """;
+
+            var result = _extractor.ExtractPage(html, contentSelector: "article");
+
+            Assert.Single(result.Images);
+            Assert.Equal("https://example.com/newsletter.png", result.Images[0].Src);
+        }
+
+        [Fact]
+        public void ExtractPage_WithoutContentSelector_IncludesSiteChrome()
+        {
+            var html = """
+                <html><body>
+                <nav>Kunskapsbank</nav>
+                <article class="guide_article"><p>Short</p></article>
+                <footer>Personuppgifter</footer>
+                </body></html>
+                """;
+
+            var result = _extractor.ExtractPage(html);
+
+            Assert.Contains("Kunskapsbank", result.EffectiveBodyText);
+            Assert.Contains("Personuppgifter", result.EffectiveBodyText);
+            Assert.Equal("body", result.ContentScope);
+        }
     }
 }

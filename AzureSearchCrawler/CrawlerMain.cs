@@ -1,10 +1,8 @@
+using AzureSearchCrawler.Adapters;
 using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
-using AzureSearchCrawler.Adapters;
 using System.CommandLine;
 using System.CommandLine.Invocation;
-using System.CommandLine.IO;  // För SystemConsole
-using System.CommandLine.Parsing;
 using System.Text.Json;
 
 namespace AzureSearchCrawler
@@ -16,57 +14,65 @@ namespace AzureSearchCrawler
     {
         private const int DefaultMaxPagesToIndex = 100;
         private const int DefaultMaxCrawlDepth = 10;
-        private readonly Func<string, string, string, string, string, string, int, bool, TextExtractor, bool, Interfaces.IConsole, AzureSearchIndexer> _indexerFactory;
-        private readonly Func<AzureSearchIndexer, CrawlMode, Interfaces.IConsole, IWebCrawlingStrategy> _crawlerFactory;
 
         private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-        // Suppressing IDE0290 as the traditional constructor provides better readability
-        // in this case with multiple parameters and complex types. Primary constructor is more suitable for simpler classes.
-#pragma warning disable IDE0290 // Use primary constructor
+        private readonly Func<string, string, string, string, string, string, int, Interfaces.IConsole, CrawledPageQueue, bool, OcrOptions, bool, (ICrawledPageProcessor, Task)> _processorFactory;
+        private readonly Func<ICrawledPageProcessor, CrawlMode, Interfaces.IConsole, IWebCrawlingStrategy> _crawlerFactory;
+
         public CrawlerMain(
-            Func<string, string, string, string, string, string, int, bool, TextExtractor, bool, Interfaces.IConsole, AzureSearchIndexer>? indexerFactory = null,
-            Func<AzureSearchIndexer, CrawlMode, Interfaces.IConsole, IWebCrawlingStrategy>? crawlerFactory = null)
+            Func<string, string, string, string, string, string, int, Interfaces.IConsole, CrawledPageQueue, bool, (ICrawledPageProcessor, Task)>? processorFactory = null,
+            Func<ICrawledPageProcessor, CrawlMode, Interfaces.IConsole, IWebCrawlingStrategy>? crawlerFactory = null)
         {
-            _indexerFactory = indexerFactory ?? DefaultIndexerFactory;
+            _processorFactory = processorFactory != null
+                ? (serviceEndPoint, adminApiKey, indexName, embeddingEndpoint, embeddingKey, embeddingDeployment,
+                    embeddingDimensions, console, queue, dryRun, _, _) =>
+                    processorFactory(
+                        serviceEndPoint, adminApiKey, indexName, embeddingEndpoint, embeddingKey, embeddingDeployment,
+                        embeddingDimensions, console, queue, dryRun)
+                : DefaultProcessorFactory;
             _crawlerFactory = crawlerFactory ?? DefaultCrawlerFactory;
         }
-#pragma warning restore IDE0290 // Use primary constructor
 
-        internal static IWebCrawlingStrategy DefaultCrawlerFactory(AzureSearchIndexer indexer, CrawlMode mode, Interfaces.IConsole console)
+        private (ICrawledPageProcessor, Task) DefaultProcessorFactory(
+            string serviceEndPoint, string adminApiKey, string indexName,
+            string embeddingEndpoint, string embeddingKey, string embeddingDeployment,
+            int embeddingDimensions, Interfaces.IConsole console, CrawledPageQueue queue, bool dryRun,
+            OcrOptions ocrOptions, bool ocrPreview)
+        {
+            var processor = new VectorizedPageProcessor(
+                serviceEndPoint, adminApiKey, indexName,
+                embeddingEndpoint, embeddingKey, embeddingDeployment,
+                embeddingDimensions, console, queue, dryRun, rateLimitDelay: null,
+                ocrOptions: ocrOptions,
+                ocrPreview: ocrPreview);
+
+            return (processor, processor.ProcessQueueAsync());
+        }
+
+        private IWebCrawlingStrategy DefaultCrawlerFactory(ICrawledPageProcessor processor, CrawlMode mode, Interfaces.IConsole console)
         {
             return mode switch
             {
-                CrawlMode.Sitemap => new SitemapCrawler(indexer, console),
-                CrawlMode.Standard => new AbotCrawler(indexer, console),
-                CrawlMode.Headless => new HeadlessBrowserCrawler(indexer, console),
-                _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", nameof(mode))
+                CrawlMode.Standard => new AbotCrawler(processor, console),
+                CrawlMode.Sitemap => new SitemapCrawler(processor, console),
+                CrawlMode.Headless => new HeadlessBrowserCrawler(processor, console),
+                _ => throw new ArgumentException($"Unsupported crawl mode: {mode}", nameof(mode)),
             };
-        }
-
-        private static AzureSearchIndexer DefaultIndexerFactory(
-            string endpoint, string index, string key, 
-            string embeddingEndpoint, string embeddingKey, string embeddingDeployment,
-            int embeddingDimensions, bool extract, TextExtractor extractor, 
-            bool dryRun, Interfaces.IConsole console)
-        {
-            return new AzureSearchIndexer(
-                endpoint, index, key, 
-                embeddingEndpoint, embeddingKey, embeddingDeployment,
-                embeddingDimensions, extract, extractor, 
-                dryRun, console);
         }
 
         // Entry point
         public static async Task<int> Main(string[] args)
         {
             var crawlerMain = new CrawlerMain();
-            return await crawlerMain.RunAsync(args, new SystemConsole());
+            return await crawlerMain.RunAsync(args, new System.CommandLine.IO.SystemConsole());
         }
 
         // Flyttad till en egen metod för testbarhet
-        public async Task<int> RunAsync(string[] args, System.CommandLine.IConsole console)
+        public async Task<int> RunAsync(string[] args, System.CommandLine.IConsole systemConsole)
         {
+            var console = new SystemConsoleAdapter(systemConsole);
+
             #region Site options
             var rootUriOption = new Option<string>(
                 aliases: ["--rootUri", "-r"],
@@ -126,15 +132,17 @@ namespace AzureSearchCrawler
             #endregion
 
             #region General options
-            var extractTextOption = new Option<bool>(
-                aliases: ["--extractText", "-e"],
-                getDefaultValue: () => true,
-                description: "Extract text from HTML (true) or save raw HTML (false)");
-
             var dryRunOption = new Option<bool>(
                 aliases: ["--dryRun", "-dr"],
                 getDefaultValue: () => false,
-                description: "Test crawling without uploading to index");
+                description: "Test crawling and link selection without uploading to the index");
+
+            var ocrPreviewOption = new Option<bool>(
+                aliases: ["--ocrPreview"],
+                getDefaultValue: () => false,
+                description:
+                    "Preview OCR threshold decisions without embeddings or indexing. " +
+                    "Add --enableOcr to also run Tesseract");
 
             var sitesFileOption = new Option<FileInfo?>(
                 aliases: ["--sitesFile", "-f"],
@@ -143,6 +151,12 @@ namespace AzureSearchCrawler
             var domSelectorOption = new Option<string>(
                 aliases: ["--domSelector", "-ds"],
                 description: "DOM selector to limit which links to follow (e.g. 'div.blog-container div.blog-main')");
+
+            var contentSelectorOption = new Option<string>(
+                aliases: ["--contentSelector", "-cs"],
+                description:
+                    "CSS selector for the main content area to extract text and images from " +
+                    "(e.g. 'article.guide_article'). When omitted, the entire body is used");
 
             var verboseOption = new Option<bool>(
                 aliases: ["--verbose", "-v"],
@@ -153,6 +167,35 @@ namespace AzureSearchCrawler
                 aliases: ["--crawlMode", "-cm"],
                 getDefaultValue: () => CrawlMode.Standard,
                 description: "Crawling mode (Standard, Headless or Sitemap)");
+
+            var enableOcrOption = new Option<bool>(
+                aliases: ["--enableOcr"],
+                getDefaultValue: () => false,
+                description: "Enable Tesseract OCR fallback for pages with little body text");
+
+            var ocrLanguageOption = new Option<string>(
+                aliases: ["--ocrLanguage"],
+                getDefaultValue: () => "swe+eng",
+                description: "Tesseract language codes (e.g. swe+eng)");
+
+            var ocrTesseractPathOption = new Option<string>(
+                aliases: ["--ocrTesseractPath"],
+                getDefaultValue: () => "tesseract",
+                description: "Path to the tesseract executable");
+
+            var ocrTessDataPathOption = new Option<string?>(
+                aliases: ["--ocrTessDataPath"],
+                description: "Optional path to a tessdata directory");
+
+            var ocrTextThresholdOption = new Option<int>(
+                aliases: ["--ocrTextThreshold"],
+                getDefaultValue: () => 200,
+                description: "Run OCR when effective body text is shorter than this many characters");
+
+            var ocrMaxImagesOption = new Option<int>(
+                aliases: ["--ocrMaxImagesPerPage"],
+                getDefaultValue: () => 10,
+                description: "Maximum number of content images to OCR on a single page");
             #endregion
 
             var rootCommand = new RootCommand("Web crawler that indexes content in Azure Search.")
@@ -167,15 +210,21 @@ namespace AzureSearchCrawler
                 embeddingAiAdminKeyOption,
                 embeddingAiDeploymentNameOption,
                 azureOpenAIEmbeddingDimensionsOption,
-                extractTextOption,
                 dryRunOption,
                 sitesFileOption,
                 domSelectorOption,
+                contentSelectorOption,
                 verboseOption,
-                modeOption
+                modeOption,
+                enableOcrOption,
+                ocrPreviewOption,
+                ocrLanguageOption,
+                ocrTesseractPathOption,
+                ocrTessDataPathOption,
+                ocrTextThresholdOption,
+                ocrMaxImagesOption
             };
 
-            int exitCode = 0;
             rootCommand.SetHandler(async (InvocationContext context) =>
             {
                 try
@@ -186,126 +235,194 @@ namespace AzureSearchCrawler
                     var adminApiKey = context.ParseResult.GetValueForOption(adminApiKeyOption);
                     var maxPages = context.ParseResult.GetValueForOption(maxPagesOption);
                     var maxDepth = context.ParseResult.GetValueForOption(maxDepthOption);
-                    var extractText = context.ParseResult.GetValueForOption(extractTextOption);
                     var dryRun = context.ParseResult.GetValueForOption(dryRunOption);
+                    var ocrPreview = context.ParseResult.GetValueForOption(ocrPreviewOption);
                     var sitesFile = context.ParseResult.GetValueForOption(sitesFileOption);
                     var domSelector = context.ParseResult.GetValueForOption(domSelectorOption);
+                    var contentSelector = context.ParseResult.GetValueForOption(contentSelectorOption);
                     var embeddingEndPoint = context.ParseResult.GetValueForOption(embeddingAiEndpointOption);
                     var embeddingAdminKey = context.ParseResult.GetValueForOption(embeddingAiAdminKeyOption);
                     var embeddingDeploymentName = context.ParseResult.GetValueForOption(embeddingAiDeploymentNameOption);
                     var azureOpenAIEmbeddingDimensions = context.ParseResult.GetValueForOption(azureOpenAIEmbeddingDimensionsOption);
                     var verbose = context.ParseResult.GetValueForOption(verboseOption);
                     var mode = context.ParseResult.GetValueForOption(modeOption);
-                    var logLevel = verbose ? LogLevel.Verbose : LogLevel.Information;
-
-                    console.WriteLine($"Verbose mode: {verbose}");  // Debug-utskrift
-                    console.WriteLine($"Crawl mode: {mode}");      // Debug-utskrift
+                    var enableOcr = context.ParseResult.GetValueForOption(enableOcrOption);
+                    var ocrLanguage = context.ParseResult.GetValueForOption(ocrLanguageOption);
+                    var ocrTesseractPath = context.ParseResult.GetValueForOption(ocrTesseractPathOption);
+                    var ocrTessDataPath = context.ParseResult.GetValueForOption(ocrTessDataPathOption);
+                    var ocrTextThreshold = context.ParseResult.GetValueForOption(ocrTextThresholdOption);
+                    var ocrMaxImagesPerPage = context.ParseResult.GetValueForOption(ocrMaxImagesOption);
+                    
+                    if (verbose)
+                    {
+                        console.SetVerbose(true);
+                    }
 
                     if (rootUri == null && sitesFile == null)
                     {
-                        console.Error.Write($"Either --rootUri or --sitesFile must be specified{Environment.NewLine}");
-                        exitCode = 1;
+                        console.WriteError($"Either --rootUri or --sitesFile must be specified{Environment.NewLine}");
+                        context.ExitCode = 1;
                         return;
                     }
 
                     if (!Uri.IsWellFormedUriString(serviceEndPoint, UriKind.Absolute))
                     {
-                        console.Error.Write($"Invalid service endpoint URL format: {serviceEndPoint}{Environment.NewLine}");
-                        exitCode = 1;
+                        console.WriteError($"Invalid service endpoint URL format: {serviceEndPoint}{Environment.NewLine}");
+                        context.ExitCode = 1;
                         return;
                     }
 
                     if (!Uri.IsWellFormedUriString(embeddingEndPoint, UriKind.Absolute))
                     {
-                        console.Error.Write($"Invalid service endpoint URL format: {embeddingEndPoint}{Environment.NewLine}");
-                        exitCode = 1;
+                        console.WriteError($"Invalid embedding endpoint URL format: {embeddingEndPoint}{Environment.NewLine}");
+                        context.ExitCode = 1;
                         return;
                     }
 
-                    // Använd den inskickade konsolen om den implementerar IConsole, annars skapa en adapter
-                    var consoleToUse = console as Interfaces.IConsole ?? new SystemConsoleAdapter(console);
-                    if (verbose)
-                    {
-                        consoleToUse.SetVerbose(true);
-                    }
-
-                    var indexer = _indexerFactory(
-                            serviceEndPoint, 
-                            indexName!, 
-                            adminApiKey!,
-                            embeddingEndPoint,
-                            embeddingAdminKey!,
-                            embeddingDeploymentName!,
-                            azureOpenAIEmbeddingDimensions,
-                            extractText,
-                            new TextExtractor(), 
-                            dryRun, 
-                            consoleToUse);
-                    var crawler = _crawlerFactory(indexer, mode, consoleToUse);
-
+                    var sites = new List<SiteConfig>();
                     if (sitesFile != null)
                     {
                         if (!sitesFile.Exists)
                         {
-                            console.Error.Write($"Sites file not found: {sitesFile.FullName}{Environment.NewLine}");
-                            exitCode = 1;
+                            console.WriteError($"Sites file not found: {sitesFile.FullName}{Environment.NewLine}");
+                            context.ExitCode = 1;
                             return;
                         }
 
                         try
                         {
-                            var sites = JsonSerializer.Deserialize<List<SiteConfig>>(
-                                await File.ReadAllTextAsync(sitesFile.FullName),
-                                _jsonOptions
-                            ) ?? throw new InvalidOperationException("Failed to deserialize sites file");
-
+                            var json = await File.ReadAllTextAsync(sitesFile.FullName);
+                            sites = JsonSerializer.Deserialize<List<SiteConfig>>(json, _jsonOptions);
                             if (sites == null || sites.Count == 0)
                             {
-                                console.Error.Write($"Could not read sites from file: {sitesFile.FullName}{Environment.NewLine}");
-                                exitCode = 1;
+                                console.WriteError($"Could not read any sites from file, or the file is empty: {sitesFile.FullName}{Environment.NewLine}");
+                                context.ExitCode = 1;
                                 return;
-                            }
-
-                            foreach (var site in sites)
-                            {
-                                if (!Uri.TryCreate(site.Uri, UriKind.Absolute, out var uri))
-                                {
-                                    console.Error.Write($"Invalid URI in sites file: {site.Uri}{Environment.NewLine}");
-                                    continue;
-                                }
-
-                                console.WriteLine($"Crawling {site.Uri} with depth {site.MaxDepth} ({site.DomSelector})...");
-                                await crawler.CrawlAsync(new Uri(site.Uri), maxPages, site.MaxDepth, site.DomSelector);
                             }
                         }
                         catch (JsonException ex)
                         {
-                            console.Error.Write($"Error parsing sites file: {ex.Message}{Environment.NewLine}");
-                            exitCode = 1;
+                            console.WriteError($"Error parsing sites file: {ex.Message}{Environment.NewLine}");
+                            context.ExitCode = 1;
                             return;
                         }
                     }
-                    else if (!Uri.TryCreate(rootUri, UriKind.Absolute, out var uri))
+                    else if (rootUri != null)
                     {
-                        console.Error.Write($"Invalid root URI format: {rootUri}{Environment.NewLine}");
-                        exitCode = 1;
+                        if (!Uri.TryCreate(rootUri, UriKind.Absolute, out var uri))
+                        {
+                            console.WriteError($"Invalid root URI format: {rootUri}{Environment.NewLine}");
+                            context.ExitCode = 1;
+                            return;
+                        }
+                        else
+                        {
+                            sites.Add(new SiteConfig
+                            {
+                                Uri = rootUri,
+                                MaxDepth = maxDepth,
+                                DomSelector = domSelector,
+                                ContentSelector = contentSelector
+                            });
+                        }
+                    }
+
+                    if (sites == null || sites.Count == 0)
+                    {
+                        console.WriteLine("No sites to crawl.", LogLevel.Warning);
                         return;
                     }
-                    else
+
+                    var queue = new CrawledPageQueue();
+                    var ocrOptions = new OcrOptions
                     {
-                        console.WriteLine($"Crawling {rootUri} with depth {maxDepth} ({domSelector})...");
-                        await crawler.CrawlAsync(new Uri(rootUri), maxPages, maxDepth, domSelector);
+                        Enabled = enableOcr,
+                        Language = ocrLanguage ?? "swe+eng",
+                        TesseractPath = ocrTesseractPath ?? "tesseract",
+                        TessDataPath = ocrTessDataPath,
+                        TextThreshold = ocrTextThreshold,
+                        MaxImagesPerPage = ocrMaxImagesPerPage
+                    };
+
+                    if (ocrPreview)
+                    {
+                        console.WriteLine(
+                            $"OCR preview is enabled (text threshold: {ocrOptions.TextThreshold}). " +
+                            "Embeddings and indexing will be skipped.",
+                            LogLevel.Information);
                     }
+
+                    if (ocrOptions.Enabled)
+                    {
+                        console.WriteLine(
+                            $"OCR fallback is enabled (language: {ocrOptions.Language}, " +
+                            $"text threshold: {ocrOptions.TextThreshold})",
+                            LogLevel.Information);
+                    }
+
+                    var (processor, processorTask) = _processorFactory(
+                        serviceEndPoint, 
+                        adminApiKey ?? throw new ArgumentException("Admin API key is required"),
+                        indexName ?? throw new ArgumentException("Index name is required"),
+                        embeddingEndPoint, 
+                        embeddingAdminKey ?? throw new ArgumentException("Embedding admin key is required"),
+                        embeddingDeploymentName  ?? throw new ArgumentException("Embedding deployment name is required"),
+                        azureOpenAIEmbeddingDimensions, console, queue, dryRun, ocrOptions, ocrPreview);
+
+                    foreach (var site in sites)
+                    {
+                        if (!Uri.TryCreate(site.Uri, UriKind.Absolute, out var uri))
+                        {
+                            console.WriteError($"Invalid URI in sites file: {site.Uri}{Environment.NewLine}");
+                            continue;
+                        }
+                        var siteMaxPages = maxPages; 
+                        var siteMaxDepth = site.MaxDepth;
+                        var siteDomSelector = site.DomSelector ?? domSelector;
+                        var siteContentSelector = site.ContentSelector ?? contentSelector;
+
+                        console.WriteLine($"Starting crawl for {site.Uri}...", LogLevel.Information);
+                        console.WriteLine(
+                            $"Config: MaxPages={siteMaxPages}, MaxDepth={siteMaxDepth}, " +
+                            $"DomSelector='{siteDomSelector}', ContentSelector='{siteContentSelector}'",
+                            LogLevel.Debug);
+
+                        var crawler = _crawlerFactory(processor, mode, console);
+
+                        try
+                        {
+                            await crawler.CrawlAsync(
+                                new Uri(site.Uri),
+                                siteMaxPages,
+                                siteMaxDepth,
+                                siteDomSelector,
+                                siteContentSelector);
+                        }
+                        catch (Exception ex)
+                        {
+                            console.WriteError($"An error occurred while crawling {site.Uri}: {ex.Message}");
+                            console.WriteLine($"Technical details: {ex}", LogLevel.Debug);
+                            context.ExitCode = 1;
+                        }
+                    }
+
+                    console.WriteLine("All crawling completed. Waiting for page processing to finish...", LogLevel.Information);
+                    
+                    // Signalera att inga fler sidor kommer och vänta på att kön bearbetas klart
+                    await processor.CrawlFinishedAsync();
+                    await processorTask;
+
+                    console.WriteLine("All tasks finished.", LogLevel.Information);
+
                 }
                 catch (Exception ex)
                 {
-                    console.Error.Write($"Error: {ex.Message}{Environment.NewLine}");
-                    exitCode = 1;
+                    console.WriteError($"Error: {ex.Message}{Environment.NewLine}");
+                    context.ExitCode = 1;
                 }
             });
 
-            var parseResult = await rootCommand.InvokeAsync(args, console);
-            return parseResult != 0 ? parseResult : exitCode;
+            return await rootCommand.InvokeAsync(args, systemConsole);
         }
     }
 }

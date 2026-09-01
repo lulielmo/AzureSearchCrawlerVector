@@ -3,16 +3,19 @@ using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
 using System.Xml;
 using System.Xml.Linq;
+using System.Net;
 
 namespace AzureSearchCrawler
 {
     public class SitemapCrawler : IWebCrawlingStrategy
     {
+        //private readonly CrawledPageQueue _queue;
         private readonly ICrawledPageProcessor _processor;
         private readonly IConsole _console;
         private readonly HttpClient _httpClient;
         private int _processedPages;
         private readonly HashSet<string> _processedSitemaps;
+        private string? _contentSelector;
 
         private static readonly string[] SITEMAP_PATHS =
         [
@@ -26,16 +29,31 @@ namespace AzureSearchCrawler
         public SitemapCrawler(ICrawledPageProcessor processor, IConsole console, HttpClient? httpClient = null)
         {
             _processor = processor ?? throw new ArgumentNullException(nameof(processor));
+            //_queue = queue ?? throw new ArgumentNullException(nameof(queue));
             _console = console ?? throw new ArgumentNullException(nameof(console));
             _httpClient = httpClient ?? new HttpClient();
             _processedSitemaps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            
+
             if (httpClient == null)
             {
                 _console.WriteLine("Setting up HTTP client with custom User-Agent", LogLevel.Verbose);
                 _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; AzureSearchCrawler/1.0)");
             }
         }
+
+        //public SitemapCrawler(CrawledPageQueue queue, IConsole console, HttpClient? httpClient = null)
+        //{
+        //    _queue = queue ?? throw new ArgumentNullException(nameof(queue));
+        //    _console = console ?? throw new ArgumentNullException(nameof(console));
+        //    _httpClient = httpClient ?? new HttpClient();
+        //    _processedSitemaps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        //    if (httpClient == null)
+        //    {
+        //        _console.WriteLine("Setting up HTTP client with custom User-Agent", LogLevel.Verbose);
+        //        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; AzureSearchCrawler/1.0)");
+        //    }
+        //}
 
         private static Uri ResolveUrl(Uri baseUri, string url)
         {
@@ -129,6 +147,7 @@ namespace AzureSearchCrawler
             var ns = doc.Root?.GetDefaultNamespace() ?? XNamespace.None;
             var urls = doc.Descendants(ns + "url").ToList();
             _console.WriteLine($"Found {urls.Count} URLs in sitemap", LogLevel.Information);
+            _console.WriteLine($"Current namespace: {ns}", LogLevel.Debug);
 
             foreach (var urlElement in urls)
             {
@@ -173,11 +192,22 @@ namespace AzureSearchCrawler
                     _console.WriteLine($"Download timing: {loadTime.TotalSeconds:F2} seconds", LogLevel.Verbose);
                     _console.WriteLine($"Request details - URL: {pageUri}, Content type: {pageContent.Length}", LogLevel.Verbose);
 
-                    var crawledPage = new CrawledPage(pageUri)
+                    if (string.IsNullOrWhiteSpace(pageContent))
                     {
-                        Content = new PageContent { Text = pageContent }
-                    };
-                    await _processor.PageCrawledAsync(crawledPage);
+                        _console.WriteLine($"Skipping empty page content: {pageUri}", LogLevel.Warning);
+                        continue;
+                    }
+
+                    var page = new CrawledWebPage(
+                        pageUri,
+                        "", // Title is extracted by VectorizedPageProcessor via TextExtractor
+                        pageContent,
+                        (int)HttpStatusCode.OK,
+                        null,
+                        _contentSelector);
+
+                    //_queue.Enqueue(page);
+                    await _processor.PageCrawledAsync(page);
                     _processedPages++;
                 }
                 catch (Exception ex)
@@ -188,11 +218,17 @@ namespace AzureSearchCrawler
             }
         }
 
-        public async Task CrawlAsync(Uri rootUri, int maxPages, int maxDepth, string? domSelector = null)
+        public async Task CrawlAsync(
+            Uri rootUri,
+            int maxPages,
+            int maxDepth,
+            string? domSelector = null,
+            string? contentSelector = null)
         {
             ArgumentNullException.ThrowIfNull(rootUri);
             if (maxPages <= 0) throw new ArgumentException("Must be greater than 0", nameof(maxPages));
             if (maxDepth <= 0) throw new ArgumentException("Must be greater than 0", nameof(maxDepth));
+            _contentSelector = contentSelector;
 
             try
             {
@@ -256,8 +292,8 @@ namespace AzureSearchCrawler
                             continue;
                         }
 
-                        await _processor.CrawlFinishedAsync();
-                        _console.WriteLine($"Crawl completed successfully. Processed {_processedPages} pages.", LogLevel.Information);
+                        //_queue.MarkAsComplete();
+                        _console.WriteLine($"Sitemap crawl completed successfully. Processed {_processedPages} pages.", LogLevel.Information);
                         return;
                     }
                     catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -277,7 +313,7 @@ namespace AzureSearchCrawler
             }
             catch (Exception ex)
             {
-                _console.WriteLine($"Critical error during crawl: {ex.Message}", LogLevel.Error);
+                _console.WriteLine($"Critical error during sitemap crawl: {ex.Message}", LogLevel.Error);
                 _console.WriteLine($"Technical details: {ex}", LogLevel.Debug);
                 throw;
             }

@@ -7,6 +7,7 @@ namespace AzureSearchCrawler
 {
     public class HeadlessBrowserCrawler : IWebCrawlingStrategy, IDisposable
     {
+        //private readonly CrawledPageQueue _queue;
         private readonly ICrawledPageProcessor _processor;
         private readonly IConsole _console;
         private readonly IPlaywright _playwright;
@@ -17,9 +18,10 @@ namespace AzureSearchCrawler
 
         public HeadlessBrowserCrawler(ICrawledPageProcessor processor, IConsole console, IPlaywright? playwright = null)
         {
+            //_queue = queue ?? throw new ArgumentNullException(nameof(queue));
             _processor = processor ?? throw new ArgumentNullException(nameof(processor));
             _console = console ?? throw new ArgumentNullException(nameof(console));
-            
+
             if (playwright == null)
             {
                 _ownsPlaywright = true;
@@ -33,6 +35,25 @@ namespace AzureSearchCrawler
 
             _browser = _playwright.Chromium.LaunchAsync().GetAwaiter().GetResult();
         }
+
+        //public HeadlessBrowserCrawler(CrawledPageQueue queue, IConsole console, IPlaywright? playwright = null)
+        //{
+        //    _queue = queue ?? throw new ArgumentNullException(nameof(queue));
+        //    _console = console ?? throw new ArgumentNullException(nameof(console));
+
+        //    if (playwright == null)
+        //    {
+        //        _ownsPlaywright = true;
+        //        _playwright = Playwright.CreateAsync().GetAwaiter().GetResult();
+        //    }
+        //    else
+        //    {
+        //        _ownsPlaywright = false;
+        //        _playwright = playwright;
+        //    }
+
+        //    _browser = _playwright.Chromium.LaunchAsync().GetAwaiter().GetResult();
+        //}
 
         public void Dispose()
         {
@@ -61,7 +82,12 @@ namespace AzureSearchCrawler
             Dispose(false);
         }
 
-        public async Task CrawlAsync(Uri rootUri, int maxPages, int maxDepth, string? domSelector = null)
+        public async Task CrawlAsync(
+            Uri rootUri,
+            int maxPages,
+            int maxDepth,
+            string? domSelector = null,
+            string? contentSelector = null)
         {
             ArgumentNullException.ThrowIfNull(rootUri);
             if (maxPages <= 0) throw new ArgumentException("Must be greater than 0", nameof(maxPages));
@@ -70,24 +96,39 @@ namespace AzureSearchCrawler
             try
             {
                 _console.WriteLine($"Starting headless browser crawl of {rootUri}", LogLevel.Information);
-                _console.WriteLine($"Configuration - Max pages: {maxPages}, Max depth: {maxDepth}, DOM selector: {domSelector ?? "none"}", LogLevel.Debug);
+                _console.WriteLine(
+                    $"Configuration - Max pages: {maxPages}, Max depth: {maxDepth}, " +
+                    $"DOM selector: {domSelector ?? "none"}, Content selector: {contentSelector ?? "none"}",
+                    LogLevel.Debug);
                 if (domSelector != null)
                 {
                     _console.WriteLine($"Using DOM selector filter: {domSelector}", LogLevel.Information);
+                }
+
+                if (contentSelector != null)
+                {
+                    _console.WriteLine($"Using content selector: {contentSelector}", LogLevel.Information);
                 }
 
                 _console.WriteLine("Initializing browser configuration", LogLevel.Information);
                 _console.WriteLine("Browser details - Engine: Chromium, Mode: Headless", LogLevel.Debug);
 
                 await using var context = await _browser.NewContextAsync();
-                var page = await context.NewPageAsync();
+                var browserPage = await context.NewPageAsync();
 
-                await page.SetExtraHTTPHeadersAsync(new Dictionary<string, string>
+                await browserPage.SetExtraHTTPHeadersAsync(new Dictionary<string, string>
                 {
                     ["User-Agent"] = "AzureSearchCrawler/1.0"
                 });
 
-                await CrawlPageAsync(page, rootUri.ToString(), maxPages, maxDepth, 0, domSelector);
+                await CrawlPageAsync(
+                    browserPage,
+                    rootUri.ToString(),
+                    maxPages,
+                    maxDepth,
+                    0,
+                    domSelector,
+                    contentSelector);
 
                 _console.WriteLine($"Crawl completed successfully. Processed {_visitedUrls.Count} pages.", LogLevel.Information);
             }
@@ -99,7 +140,14 @@ namespace AzureSearchCrawler
             }
         }
 
-        private async Task CrawlPageAsync(IPage page, string url, int maxPages, int maxDepth, int currentDepth, string? domSelector)
+        private async Task CrawlPageAsync(
+            IPage browserPage,
+            string url,
+            int maxPages,
+            int maxDepth,
+            int currentDepth,
+            string? domSelector,
+            string? contentSelector)
         {
             if (currentDepth > maxDepth)
             {
@@ -122,23 +170,16 @@ namespace AzureSearchCrawler
                 _console.WriteLine($"Processing page {_visitedUrls.Count + 1}/{maxPages}: {url}", LogLevel.Information);
                 _console.WriteLine($"Page details - Depth: {currentDepth}/{maxDepth}", LogLevel.Debug);
 
-                var startTime = DateTime.Now;
-                _console.WriteLine($"About to call GotoAsync for {url}", LogLevel.Debug);
-                var response = await page.GotoAsync(url, new PageGotoOptions 
-                { 
-                    WaitUntil = WaitUntilState.NetworkIdle,
-                    Timeout = 30000
-                });
-                var loadTime = DateTime.Now - startTime;
-                
-                _console.WriteLine($"GotoAsync returned, response.Ok = {response?.Ok}, response.Status = {response?.Status}", LogLevel.Debug);
-                _console.WriteLine($"Navigation details - Status: {response?.Status}, Load time: {loadTime.TotalSeconds:F2}s", LogLevel.Debug);
-                _console.WriteLine($"Request configuration - Timeout: 30000ms, WaitUntil: NetworkIdle", LogLevel.Verbose);
-                _console.WriteLine($"Response headers: {string.Join(", ", response?.Headers.Select(h => $"{h.Key}: {h.Value}") ?? [])}", LogLevel.Verbose);
-
-                if (response?.Ok != true)
+                var response = await browserPage.GotoAsync(url);
+                if (response == null)
                 {
-                    _console.WriteLine($"Failed to load {url} ({response?.Status} {response?.StatusText})", LogLevel.Warning);
+                    _console.WriteLine($"Failed to load page: {url}", LogLevel.Warning);
+                    return;
+                }
+
+                if (!response.Ok)
+                {
+                    _console.WriteLine($"Received non-200 status code {response.Status} for {url}", LogLevel.Warning);
                     return;
                 }
 
@@ -146,7 +187,7 @@ namespace AzureSearchCrawler
                 try
                 {
                     _console.WriteLine($"About to call ContentAsync", LogLevel.Debug);
-                    content = await page.ContentAsync();
+                    content = await browserPage.ContentAsync();
                     _console.WriteLine($"ContentAsync returned, content.Length = {content.Length}", LogLevel.Debug);
                 }
                 catch (Exception ex)
@@ -156,15 +197,25 @@ namespace AzureSearchCrawler
                     throw;
                 }
                 
+                if (string.IsNullOrWhiteSpace(content))
+                {
+                    _console.WriteLine($"Skipping empty page content: {url}", LogLevel.Warning);
+                    return;
+                }
+
                 _console.WriteLine($"Content details - Size: {content.Length} bytes", LogLevel.Debug);
 
                 _visitedUrls.Add(url);
 
-                var crawledPage = new CrawledPage(new Uri(url))
-                {
-                    Content = new PageContent { Text = content }
-                };
+                var crawledPage = new CrawledWebPage(
+                    new Uri(url),
+                    await browserPage.TitleAsync(),
+                    content,
+                    response.Status,
+                    null,
+                    contentSelector);
 
+                //_queue.Enqueue(crawledPage);
                 await _processor.PageCrawledAsync(crawledPage);
 
                 // Don't extract links if we're at max depth
@@ -178,7 +229,7 @@ namespace AzureSearchCrawler
                 _console.WriteLine($"Link extraction - Using selector: {selector}", LogLevel.Debug);
 
                 _console.WriteLine($"About to call QuerySelectorAllAsync with selector: {selector}", LogLevel.Debug);
-                var links = await page.QuerySelectorAllAsync(selector);
+                var links = await browserPage.QuerySelectorAllAsync(selector);
                 _console.WriteLine($"Found {links.Count} links on page", LogLevel.Debug);
                 var validLinks = new List<string>();
 
@@ -190,59 +241,64 @@ namespace AzureSearchCrawler
 
                 foreach (var link in links)
                 {
+                    var href = await link.GetAttributeAsync("href");
+                    if (string.IsNullOrEmpty(href))
+                    {
+                        _console.WriteLine("Skipping link with empty href", LogLevel.Debug);
+                        continue;
+                    }
+
                     try
                     {
-                        var href = await link.GetAttributeAsync("href");
-                        _console.WriteLine($"Link validation - URL: {href}", LogLevel.Verbose);
-
-                        if (!string.IsNullOrEmpty(href) && !IsValidUrl(href))
+                        if (!IsValidUrl(href))
                         {
                             _console.WriteLine($"Skipping invalid URL: {href}", LogLevel.Warning);
                             continue;
                         }
 
-                        var absoluteUrl = new Uri(new Uri(url), href).ToString();
-                        _console.WriteLine($"Processing valid URL: {absoluteUrl}", LogLevel.Debug);
-                        validLinks.Add(absoluteUrl);
+                        var linkUri = new Uri(new Uri(url), href);
+                        if (linkUri.Host == new Uri(url).Host)
+                        {
+                            var absoluteUrl = linkUri.ToString();
+                            _console.WriteLine($"Processing valid URL: {absoluteUrl}", LogLevel.Debug);
+                            validLinks.Add(absoluteUrl);
+                        }
+                        else
+                        {
+                            _console.WriteLine($"Skipping external link: {linkUri}", LogLevel.Debug);
+                        }
                     }
-                    catch (Exception ex)
+                    catch (UriFormatException)
                     {
-                        _console.WriteLine($"Failed to process link: {ex.Message}", LogLevel.Warning);
-                        _console.WriteLine($"Technical details: {ex}", LogLevel.Debug);
-                        // Continue with next link
+                        _console.WriteLine($"Skipping malformed URL: {href}", LogLevel.Debug);
                     }
                 }
 
-                _console.WriteLine($"Found {validLinks.Count} valid links", LogLevel.Information);
+                _console.WriteLine($"Found {validLinks.Count} valid links to crawl", LogLevel.Debug);
 
-                foreach (var nextUrl in validLinks)
+                foreach (var link in validLinks)
                 {
-                    _console.WriteLine($"About to create new page for {nextUrl}", LogLevel.Debug);
-                    var nextPage = await page.Context.NewPageAsync();
-                    _console.WriteLine($"About to call CrawlPageAsync for {nextUrl}", LogLevel.Debug);
-                    await CrawlPageAsync(nextPage, nextUrl, maxPages, maxDepth, currentDepth + 1, domSelector);
-                    _console.WriteLine($"CrawlPageAsync returned, about to close page", LogLevel.Debug);
-                    await nextPage.CloseAsync();
-                    _console.WriteLine($"Page closed", LogLevel.Debug);
+                    if (_visitedUrls.Count >= maxPages)
+                    {
+                        _console.WriteLine($"Crawl complete: Reached maximum pages limit ({maxPages})", LogLevel.Information);
+                        return;
+                    }
+
+                    var newPage = await browserPage.Context.NewPageAsync();
+                    await newPage.SetExtraHTTPHeadersAsync(new Dictionary<string, string>
+                    {
+                        ["User-Agent"] = "AzureSearchCrawler/1.0"
+                    });
+
+                    await CrawlPageAsync(newPage, link, maxPages, maxDepth, currentDepth + 1, domSelector, contentSelector);
+                    await newPage.CloseAsync();
                 }
             }
             catch (Exception ex)
             {
-                _console.WriteLine($"Failed to crawl {url}: {ex.Message}", LogLevel.Error);
+                _console.WriteLine($"Error crawling {url}: {ex.Message}", LogLevel.Error);
                 _console.WriteLine($"Technical details: {ex}", LogLevel.Debug);
             }
-        }
-
-        private static bool IsValidUrl(string href)
-        {
-            return !string.IsNullOrEmpty(href) &&
-                   !href.StartsWith('#') &&
-                   !href.StartsWith("javascript:") &&
-                   !href.StartsWith("mailto:") &&
-                   !href.StartsWith("tel:") &&
-                   (href.StartsWith("http://") 
-                    || href.StartsWith("https://") 
-                    || href.StartsWith('/'));
         }
 
         // Method for testing purposes
@@ -282,6 +338,18 @@ namespace AzureSearchCrawler
             }
 
             _console.WriteLine($"Found {validLinks.Count} valid links", LogLevel.Information);
+        }
+
+        private static bool IsValidUrl(string href)
+        {
+            return !string.IsNullOrEmpty(href) &&
+                   !href.StartsWith('#') &&
+                   !href.StartsWith("javascript:") &&
+                   !href.StartsWith("mailto:") &&
+                   !href.StartsWith("tel:") &&
+                   (href.StartsWith("http://") 
+                    || href.StartsWith("https://") 
+                    || href.StartsWith('/'));
         }
     }
 } 
