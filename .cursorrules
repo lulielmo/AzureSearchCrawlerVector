@@ -139,7 +139,7 @@
                     "documentation": {
                         "required": true,
                         "format": "XML documentation comment explaining the exclusion",
-                        "example": "/// <summary>\n/// Adapter class that bridges System.CommandLine.IConsole to our own IConsole interface.\n/// This class is used only in production code as a fallback when running the actual CLI application.\n/// It's excluded from code coverage because:\n/// 1. It's a pure adapter with no business logic\n/// 2. In tests, we use TestConsole instead to capture and verify console output\n/// 3. Testing console output in production would require integration tests with the actual console,\n///    which would be unreliable and not provide additional value\n/// </summary>"
+                        "example": "/// <summary>\n/// Writes crawler log messages to the process console.\n/// This class is used only in production code as a fallback when running the actual CLI application.\n/// It's excluded from code coverage because:\n/// 1. It's a pure adapter with no business logic\n/// 2. In tests, we use TestConsole instead to capture and verify console output\n/// 3. Testing console output in production would require integration tests with the actual console,\n///    which would be unreliable and not provide additional value\n/// </summary>"
                     }
                 }
             }

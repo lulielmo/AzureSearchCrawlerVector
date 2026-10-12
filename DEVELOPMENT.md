@@ -200,7 +200,7 @@ When excluding a class from coverage, we must:
 Example:
 ```csharp
 /// <summary>
-/// Adapter class that bridges System.CommandLine.IConsole to our own IConsole interface.
+/// Writes crawler log messages to the process console.
 /// This class is used only in production code as a fallback when running the actual CLI application.
 /// It's excluded from code coverage because:
 /// 1. It's a pure adapter with no business logic

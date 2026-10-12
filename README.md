@@ -58,44 +58,31 @@ Usage:
   AzureSearchCrawler [options]
 
 Options:
-  -r, --rootUri <rootUri>                                    Root URI to start crawling from
-  -m, --maxPages <maxPages>                                  Maximum number of pages to index [default: 100]
-  -d, --maxDepth <maxDepth>                                  Maximum crawl depth [default: 10]
-  -s, --serviceEndPoint <serviceEndPoint> (REQUIRED)         Azure Search service endpoint
-  -i, --indexName <indexName> (REQUIRED)                     Name of the search index
-  -a, --adminApiKey <adminApiKey> (REQUIRED)                 Admin API key for Azure Search
-  -ee, --embeddingEndPoint <embeddingEndPoint> (REQUIRED)    The Url (service end point) of your Azure AI Embedding
-                                                             service
-  -ek, --embeddingAdminKey <embeddingAdminKey> (REQUIRED)    The admin key for your Azure AI Embedding service
-  -ed, --embeddingDeploymentName <embeddingDeploymentName>   The name of the deployment for your Azure AI Embedding
-  (REQUIRED)                                                 service
-  -aed, --azureOpenAIEmbeddingDimensions                     The dimensions of the embedding
-  <azureOpenAIEmbeddingDimensions> (REQUIRED)
-  -dr, --dryRun                                              Test crawling and link selection without uploading to
-                                                             the index [default: False]
-  --ocrPreview                                               Preview OCR threshold decisions without embeddings or
-                                                             indexing. Add --enableOcr to also run Tesseract
-                                                             [default: False]
-  -f, --sitesFile <sitesFile>                                Path to a JSON file containing sites to crawl
-  -ds, --domSelector <domSelector>                           DOM selector to limit which links to follow (e.g.
-                                                             'div.blog-container div.blog-main')
-  -cs, --contentSelector <contentSelector>                   CSS selector for the main content area to extract text
-                                                             and images from (e.g. 'article.guide_article'). When
-                                                             omitted, the entire body is used
-  -v, --verbose                                              Enable verbose output [default: False]
-  -cm, --crawlMode <Headless|Sitemap|Standard>               Crawling mode (Standard, Headless or Sitemap) [default:
-                                                             Standard]
-  --enableOcr                                                Enable Tesseract OCR fallback for pages with little body
-                                                             text [default: False]
-  --ocrLanguage <ocrLanguage>                                Tesseract language codes (e.g. swe+eng) [default: swe+eng]
-  --ocrTesseractPath <ocrTesseractPath>                      Path to the tesseract executable [default: tesseract]
-  --ocrTessDataPath <ocrTessDataPath>                        Optional path to a tessdata directory
-  --ocrTextThreshold <ocrTextThreshold>                      Run OCR when effective body text is shorter than this many
-                                                             characters [default: 200]
-  --ocrMaxImagesPerPage <ocrMaxImagesPerPage>                Maximum number of content images to OCR on a single page
-                                                             [default: 10]
-  --version                                                  Show version information
-  -?, -h, --help                                             Show help and usage information
+  -r, --rootUri <rootUri>                                                             Root URI to start crawling from
+  -m, --maxPages <maxPages>                                                           Maximum number of pages to index [default: 100]
+  -d, --maxDepth <maxDepth>                                                           Maximum crawl depth [default: 10]
+  -s, --serviceEndPoint <serviceEndPoint> (REQUIRED)                                  Azure Search service endpoint
+  -i, --indexName <indexName> (REQUIRED)                                              Name of the search index
+  -a, --adminApiKey <adminApiKey> (REQUIRED)                                          Admin API key for Azure Search
+  -ee, --embeddingEndPoint <embeddingEndPoint> (REQUIRED)                             The Url (service end point) of your Azure AI Embedding service
+  -ek, --embeddingAdminKey <embeddingAdminKey> (REQUIRED)                             The admin key for your Azure AI Embedding service
+  -ed, --embeddingDeploymentName <embeddingDeploymentName> (REQUIRED)                 The name of the deployment for your Azure AI Embedding service
+  -aed, --azureOpenAIEmbeddingDimensions <azureOpenAIEmbeddingDimensions> (REQUIRED)  The dimensions of the embedding
+  -dr, --dryRun                                                                       Test crawling and link selection without uploading to the index
+  -f, --sitesFile <sitesFile>                                                         Path to a JSON file containing sites to crawl
+  -ds, --domSelector <domSelector>                                                    DOM selector to limit which links to follow (e.g. 'div.blog-container div.blog-main')
+  -cs, --contentSelector <contentSelector>                                            CSS selector for the main content area to extract text and images from (e.g. 'article.guide_article'). When omitted, the entire body is used
+  -v, --verbose                                                                       Enable verbose output
+  -cm, --crawlMode <Headless|Sitemap|Standard>                                        Crawling mode (Standard, Headless or Sitemap) [default: Standard]
+  --enableOcr                                                                         Enable Tesseract OCR fallback for pages with little body text
+  --ocrPreview                                                                        Preview OCR threshold decisions without embeddings or indexing. Add --enableOcr to also run Tesseract
+  --ocrLanguage <ocrLanguage>                                                         Tesseract language codes (e.g. swe+eng) [default: swe+eng]
+  --ocrTesseractPath <ocrTesseractPath>                                               Path to the tesseract executable [default: tesseract]
+  --ocrTessDataPath <ocrTessDataPath>                                                 Optional path to a tessdata directory
+  --ocrTextThreshold <ocrTextThreshold>                                               Run OCR when effective body text is shorter than this many characters [default: 200]
+  --ocrMaxImagesPerPage <ocrMaxImagesPerPage>                                         Maximum number of content images to OCR on a single page [default: 10]
+  -?, -h, --help                                                                      Show help and usage information
+  --version                                                                           Show version information
 ```
 > [!TIP]
 > `--dryRun` tests navigation and link selection (`maxDepth`, `domSelector`) without calling Azure.
