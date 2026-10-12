@@ -296,8 +296,6 @@ namespace AzureSearchCrawler
 
         private static CrawlConfiguration CreateCrawlConfiguration(int maxPages, int maxDepth)
         {
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-
             CrawlConfiguration crawlConfig = new()
             {
                 CrawlTimeoutSeconds = maxPages * 10,
