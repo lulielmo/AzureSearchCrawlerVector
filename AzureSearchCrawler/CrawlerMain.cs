@@ -2,7 +2,6 @@ using AzureSearchCrawler.Adapters;
 using AzureSearchCrawler.Interfaces;
 using AzureSearchCrawler.Models;
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Text.Json;
 
 namespace AzureSearchCrawler
@@ -65,193 +64,226 @@ namespace AzureSearchCrawler
         public static async Task<int> Main(string[] args)
         {
             var crawlerMain = new CrawlerMain();
-            return await crawlerMain.RunAsync(args, new System.CommandLine.IO.SystemConsole());
+            return await crawlerMain.RunAsync(args, new SystemConsoleAdapter());
         }
 
         // Flyttad till en egen metod för testbarhet
-        public async Task<int> RunAsync(string[] args, System.CommandLine.IConsole systemConsole)
+        public async Task<int> RunAsync(string[] args, Interfaces.IConsole console)
         {
-            var console = new SystemConsoleAdapter(systemConsole);
 
             #region Site options
-            var rootUriOption = new Option<string>(
-                aliases: ["--rootUri", "-r"],
-                description: "Root URI to start crawling from");
+            var rootUriOption = new Option<string>("--rootUri", "-r")
+            {
+                Description = "Root URI to start crawling from"
+            };
 
+            var maxPagesOption = new Option<int>("--maxPages", "-m")
+            {
+                Description = "Maximum number of pages to index",
+                DefaultValueFactory = _ => DefaultMaxPagesToIndex
+            };
 
-            var maxPagesOption = new Option<int>(
-                aliases: ["--maxPages", "-m"],
-                getDefaultValue: () => DefaultMaxPagesToIndex,
-                description: "Maximum number of pages to index");
-
-            var maxDepthOption = new Option<int>(
-                aliases: ["--maxDepth", "-d"],
-                getDefaultValue: () => DefaultMaxCrawlDepth,
-                description: "Maximum crawl depth");
+            var maxDepthOption = new Option<int>("--maxDepth", "-d")
+            {
+                Description = "Maximum crawl depth",
+                DefaultValueFactory = _ => DefaultMaxCrawlDepth
+            };
             #endregion
 
             #region Search service options
-            var serviceEndPointOption = new Option<string>(
-                aliases: ["--serviceEndPoint", "-s"],
-                description: "Azure Search service endpoint")
-            { IsRequired = true };
+            var serviceEndPointOption = new Option<string>("--serviceEndPoint", "-s")
+            {
+                Description = "Azure Search service endpoint",
+                Required = true
+            };
 
-            var indexNameOption = new Option<string>(
-                aliases: ["--indexName", "-i"],
-                description: "Name of the search index")
-            { IsRequired = true };
+            var indexNameOption = new Option<string>("--indexName", "-i")
+            {
+                Description = "Name of the search index",
+                Required = true
+            };
 
-            var adminApiKeyOption = new Option<string>(
-                aliases: ["--adminApiKey", "-a"],
-                description: "Admin API key for Azure Search")
-            { IsRequired = true };
+            var adminApiKeyOption = new Option<string>("--adminApiKey", "-a")
+            {
+                Description = "Admin API key for Azure Search",
+                Required = true
+            };
             #endregion
 
             #region Embedding service options
 
-            var embeddingAiEndpointOption = new Option<string>(
-                aliases: ["--embeddingEndPoint", "-ee"],
-                description: "The Url (service end point) of your Azure AI Embedding service")
-            { IsRequired = true };
+            var embeddingAiEndpointOption = new Option<string>("--embeddingEndPoint", "-ee")
+            {
+                Description = "The Url (service end point) of your Azure AI Embedding service",
+                Required = true
+            };
 
-            var embeddingAiAdminKeyOption = new Option<string>(
-                aliases: ["--embeddingAdminKey", "-ek"],
-                description: "The admin key for your Azure AI Embedding service")
-            { IsRequired = true };
+            var embeddingAiAdminKeyOption = new Option<string>("--embeddingAdminKey", "-ek")
+            {
+                Description = "The admin key for your Azure AI Embedding service",
+                Required = true
+            };
 
-            var embeddingAiDeploymentNameOption = new Option<string>(
-                aliases: ["--embeddingDeploymentName", "-ed"],
-                description: "The name of the deployment for your Azure AI Embedding service")
-            { IsRequired = true };
+            var embeddingAiDeploymentNameOption = new Option<string>("--embeddingDeploymentName", "-ed")
+            {
+                Description = "The name of the deployment for your Azure AI Embedding service",
+                Required = true
+            };
 
-            var azureOpenAIEmbeddingDimensionsOption = new Option<int>(
-                aliases: ["--azureOpenAIEmbeddingDimensions", "-aed"],
-                description: "The dimensions of the embedding")
-            { IsRequired = true };
+            var azureOpenAIEmbeddingDimensionsOption = new Option<int>("--azureOpenAIEmbeddingDimensions", "-aed")
+            {
+                Description = "The dimensions of the embedding",
+                Required = true
+            };
 
             #endregion
 
             #region General options
-            var dryRunOption = new Option<bool>(
-                aliases: ["--dryRun", "-dr"],
-                getDefaultValue: () => false,
-                description: "Test crawling and link selection without uploading to the index");
-
-            var ocrPreviewOption = new Option<bool>(
-                aliases: ["--ocrPreview"],
-                getDefaultValue: () => false,
-                description:
-                    "Preview OCR threshold decisions without embeddings or indexing. " +
-                    "Add --enableOcr to also run Tesseract");
-
-            var sitesFileOption = new Option<FileInfo?>(
-                aliases: ["--sitesFile", "-f"],
-                description: "Path to a JSON file containing sites to crawl");
-
-            var domSelectorOption = new Option<string>(
-                aliases: ["--domSelector", "-ds"],
-                description: "DOM selector to limit which links to follow (e.g. 'div.blog-container div.blog-main')");
-
-            var contentSelectorOption = new Option<string>(
-                aliases: ["--contentSelector", "-cs"],
-                description:
-                    "CSS selector for the main content area to extract text and images from " +
-                    "(e.g. 'article.guide_article'). When omitted, the entire body is used");
-
-            var verboseOption = new Option<bool>(
-                aliases: ["--verbose", "-v"],
-                getDefaultValue: () => false,
-                description:"Enable verbose output");
-
-            var modeOption = new Option<CrawlMode>(
-                aliases: ["--crawlMode", "-cm"],
-                getDefaultValue: () => CrawlMode.Standard,
-                description: "Crawling mode (Standard, Headless or Sitemap)");
-
-            var enableOcrOption = new Option<bool>(
-                aliases: ["--enableOcr"],
-                getDefaultValue: () => false,
-                description: "Enable Tesseract OCR fallback for pages with little body text");
-
-            var ocrLanguageOption = new Option<string>(
-                aliases: ["--ocrLanguage"],
-                getDefaultValue: () => "swe+eng",
-                description: "Tesseract language codes (e.g. swe+eng)");
-
-            var ocrTesseractPathOption = new Option<string>(
-                aliases: ["--ocrTesseractPath"],
-                getDefaultValue: () => "tesseract",
-                description: "Path to the tesseract executable");
-
-            var ocrTessDataPathOption = new Option<string?>(
-                aliases: ["--ocrTessDataPath"],
-                description: "Optional path to a tessdata directory");
-
-            var ocrTextThresholdOption = new Option<int>(
-                aliases: ["--ocrTextThreshold"],
-                getDefaultValue: () => 200,
-                description: "Run OCR when effective body text is shorter than this many characters");
-
-            var ocrMaxImagesOption = new Option<int>(
-                aliases: ["--ocrMaxImagesPerPage"],
-                getDefaultValue: () => 10,
-                description: "Maximum number of content images to OCR on a single page");
-            #endregion
-
-            var rootCommand = new RootCommand("Web crawler that indexes content in Azure Search.")
+            var dryRunOption = new Option<bool>("--dryRun", "-dr")
             {
-                rootUriOption,
-                maxPagesOption,
-                maxDepthOption,
-                serviceEndPointOption,
-                indexNameOption,
-                adminApiKeyOption,
-                embeddingAiEndpointOption,
-                embeddingAiAdminKeyOption,
-                embeddingAiDeploymentNameOption,
-                azureOpenAIEmbeddingDimensionsOption,
-                dryRunOption,
-                sitesFileOption,
-                domSelectorOption,
-                contentSelectorOption,
-                verboseOption,
-                modeOption,
-                enableOcrOption,
-                ocrPreviewOption,
-                ocrLanguageOption,
-                ocrTesseractPathOption,
-                ocrTessDataPathOption,
-                ocrTextThresholdOption,
-                ocrMaxImagesOption
+                Description = "Test crawling and link selection without uploading to the index",
+                DefaultValueFactory = _ => false
             };
 
-            rootCommand.SetHandler(async (InvocationContext context) =>
+            var ocrPreviewOption = new Option<bool>("--ocrPreview")
             {
+                Description =
+                    "Preview OCR threshold decisions without embeddings or indexing. " +
+                    "Add --enableOcr to also run Tesseract",
+                DefaultValueFactory = _ => false
+            };
+
+            var sitesFileOption = new Option<FileInfo?>("--sitesFile", "-f")
+            {
+                Description = "Path to a JSON file containing sites to crawl"
+            };
+
+            var domSelectorOption = new Option<string>("--domSelector", "-ds")
+            {
+                Description = "DOM selector to limit which links to follow (e.g. 'div.blog-container div.blog-main')"
+            };
+
+            var contentSelectorOption = new Option<string>("--contentSelector", "-cs")
+            {
+                Description =
+                    "CSS selector for the main content area to extract text and images from " +
+                    "(e.g. 'article.guide_article'). When omitted, the entire body is used"
+            };
+
+            var verboseOption = new Option<bool>("--verbose", "-v")
+            {
+                Description = "Enable verbose output",
+                DefaultValueFactory = _ => false
+            };
+
+            var modeOption = new Option<CrawlMode>("--crawlMode", "-cm")
+            {
+                Description = "Crawling mode (Standard, Headless or Sitemap)",
+                DefaultValueFactory = _ => CrawlMode.Standard
+            };
+
+            var enableOcrOption = new Option<bool>("--enableOcr")
+            {
+                Description = "Enable Tesseract OCR fallback for pages with little body text",
+                DefaultValueFactory = _ => false
+            };
+
+            var ocrLanguageOption = new Option<string>("--ocrLanguage")
+            {
+                Description = "Tesseract language codes (e.g. swe+eng)",
+                DefaultValueFactory = _ => "swe+eng"
+            };
+
+            var ocrTesseractPathOption = new Option<string>("--ocrTesseractPath")
+            {
+                Description = "Path to the tesseract executable",
+                DefaultValueFactory = _ => "tesseract"
+            };
+
+            var ocrTessDataPathOption = new Option<string?>("--ocrTessDataPath")
+            {
+                Description = "Optional path to a tessdata directory"
+            };
+
+            var ocrTextThresholdOption = new Option<int>("--ocrTextThreshold")
+            {
+                Description = "Run OCR when effective body text is shorter than this many characters",
+                DefaultValueFactory = _ => 200
+            };
+
+            var ocrMaxImagesOption = new Option<int>("--ocrMaxImagesPerPage")
+            {
+                Description = "Maximum number of content images to OCR on a single page",
+                DefaultValueFactory = _ => 10
+            };
+            #endregion
+
+            var rootCommand = new RootCommand("Web crawler that indexes content in Azure Search.");
+            rootCommand.Options.Add(rootUriOption);
+            rootCommand.Options.Add(maxPagesOption);
+            rootCommand.Options.Add(maxDepthOption);
+            rootCommand.Options.Add(serviceEndPointOption);
+            rootCommand.Options.Add(indexNameOption);
+            rootCommand.Options.Add(adminApiKeyOption);
+            rootCommand.Options.Add(embeddingAiEndpointOption);
+            rootCommand.Options.Add(embeddingAiAdminKeyOption);
+            rootCommand.Options.Add(embeddingAiDeploymentNameOption);
+            rootCommand.Options.Add(azureOpenAIEmbeddingDimensionsOption);
+            rootCommand.Options.Add(dryRunOption);
+            rootCommand.Options.Add(sitesFileOption);
+            rootCommand.Options.Add(domSelectorOption);
+            rootCommand.Options.Add(contentSelectorOption);
+            rootCommand.Options.Add(verboseOption);
+            rootCommand.Options.Add(modeOption);
+            rootCommand.Options.Add(enableOcrOption);
+            rootCommand.Options.Add(ocrPreviewOption);
+            rootCommand.Options.Add(ocrLanguageOption);
+            rootCommand.Options.Add(ocrTesseractPathOption);
+            rootCommand.Options.Add(ocrTessDataPathOption);
+            rootCommand.Options.Add(ocrTextThresholdOption);
+            rootCommand.Options.Add(ocrMaxImagesOption);
+
+            rootCommand.SetAction((parseResult, cancellationToken) =>
+            {
+                return ExecuteAsync(parseResult, cancellationToken);
+            });
+
+            var output = console is Interfaces.IConsoleStreams streams ? streams.Output : Console.Out;
+            var error = console is Interfaces.IConsoleStreams streamsError ? streamsError.Error : Console.Error;
+            return await rootCommand.Parse(args).InvokeAsync(new InvocationConfiguration
+            {
+                Output = output,
+                Error = error
+            });
+
+            async Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
+            {
+                var exitCode = 0;
                 try
                 {
-                    var rootUri = context.ParseResult.GetValueForOption(rootUriOption);
-                    var serviceEndPoint = context.ParseResult.GetValueForOption(serviceEndPointOption);
-                    var indexName = context.ParseResult.GetValueForOption(indexNameOption);
-                    var adminApiKey = context.ParseResult.GetValueForOption(adminApiKeyOption);
-                    var maxPages = context.ParseResult.GetValueForOption(maxPagesOption);
-                    var maxDepth = context.ParseResult.GetValueForOption(maxDepthOption);
-                    var dryRun = context.ParseResult.GetValueForOption(dryRunOption);
-                    var ocrPreview = context.ParseResult.GetValueForOption(ocrPreviewOption);
-                    var sitesFile = context.ParseResult.GetValueForOption(sitesFileOption);
-                    var domSelector = context.ParseResult.GetValueForOption(domSelectorOption);
-                    var contentSelector = context.ParseResult.GetValueForOption(contentSelectorOption);
-                    var embeddingEndPoint = context.ParseResult.GetValueForOption(embeddingAiEndpointOption);
-                    var embeddingAdminKey = context.ParseResult.GetValueForOption(embeddingAiAdminKeyOption);
-                    var embeddingDeploymentName = context.ParseResult.GetValueForOption(embeddingAiDeploymentNameOption);
-                    var azureOpenAIEmbeddingDimensions = context.ParseResult.GetValueForOption(azureOpenAIEmbeddingDimensionsOption);
-                    var verbose = context.ParseResult.GetValueForOption(verboseOption);
-                    var mode = context.ParseResult.GetValueForOption(modeOption);
-                    var enableOcr = context.ParseResult.GetValueForOption(enableOcrOption);
-                    var ocrLanguage = context.ParseResult.GetValueForOption(ocrLanguageOption);
-                    var ocrTesseractPath = context.ParseResult.GetValueForOption(ocrTesseractPathOption);
-                    var ocrTessDataPath = context.ParseResult.GetValueForOption(ocrTessDataPathOption);
-                    var ocrTextThreshold = context.ParseResult.GetValueForOption(ocrTextThresholdOption);
-                    var ocrMaxImagesPerPage = context.ParseResult.GetValueForOption(ocrMaxImagesOption);
+                    var rootUri = parseResult.GetValue(rootUriOption);
+                    var serviceEndPoint = parseResult.GetValue(serviceEndPointOption);
+                    var indexName = parseResult.GetValue(indexNameOption);
+                    var adminApiKey = parseResult.GetValue(adminApiKeyOption);
+                    var maxPages = parseResult.GetValue(maxPagesOption);
+                    var maxDepth = parseResult.GetValue(maxDepthOption);
+                    var dryRun = parseResult.GetValue(dryRunOption);
+                    var ocrPreview = parseResult.GetValue(ocrPreviewOption);
+                    var sitesFile = parseResult.GetValue(sitesFileOption);
+                    var domSelector = parseResult.GetValue(domSelectorOption);
+                    var contentSelector = parseResult.GetValue(contentSelectorOption);
+                    var embeddingEndPoint = parseResult.GetValue(embeddingAiEndpointOption);
+                    var embeddingAdminKey = parseResult.GetValue(embeddingAiAdminKeyOption);
+                    var embeddingDeploymentName = parseResult.GetValue(embeddingAiDeploymentNameOption);
+                    var azureOpenAIEmbeddingDimensions = parseResult.GetValue(azureOpenAIEmbeddingDimensionsOption);
+                    var verbose = parseResult.GetValue(verboseOption);
+                    var mode = parseResult.GetValue(modeOption);
+                    var enableOcr = parseResult.GetValue(enableOcrOption);
+                    var ocrLanguage = parseResult.GetValue(ocrLanguageOption);
+                    var ocrTesseractPath = parseResult.GetValue(ocrTesseractPathOption);
+                    var ocrTessDataPath = parseResult.GetValue(ocrTessDataPathOption);
+                    var ocrTextThreshold = parseResult.GetValue(ocrTextThresholdOption);
+                    var ocrMaxImagesPerPage = parseResult.GetValue(ocrMaxImagesOption);
                     
                     if (verbose)
                     {
@@ -261,22 +293,19 @@ namespace AzureSearchCrawler
                     if (rootUri == null && sitesFile == null)
                     {
                         console.WriteError($"Either --rootUri or --sitesFile must be specified{Environment.NewLine}");
-                        context.ExitCode = 1;
-                        return;
+                        return 1;
                     }
 
                     if (!Uri.IsWellFormedUriString(serviceEndPoint, UriKind.Absolute))
                     {
                         console.WriteError($"Invalid service endpoint URL format: {serviceEndPoint}{Environment.NewLine}");
-                        context.ExitCode = 1;
-                        return;
+                        return 1;
                     }
 
                     if (!Uri.IsWellFormedUriString(embeddingEndPoint, UriKind.Absolute))
                     {
                         console.WriteError($"Invalid embedding endpoint URL format: {embeddingEndPoint}{Environment.NewLine}");
-                        context.ExitCode = 1;
-                        return;
+                        return 1;
                     }
 
                     var sites = new List<SiteConfig>();
@@ -285,26 +314,23 @@ namespace AzureSearchCrawler
                         if (!sitesFile.Exists)
                         {
                             console.WriteError($"Sites file not found: {sitesFile.FullName}{Environment.NewLine}");
-                            context.ExitCode = 1;
-                            return;
+                            return 1;
                         }
 
                         try
                         {
-                            var json = await File.ReadAllTextAsync(sitesFile.FullName);
+                            var json = await File.ReadAllTextAsync(sitesFile.FullName, cancellationToken);
                             sites = JsonSerializer.Deserialize<List<SiteConfig>>(json, _jsonOptions);
                             if (sites == null || sites.Count == 0)
                             {
                                 console.WriteError($"Could not read any sites from file, or the file is empty: {sitesFile.FullName}{Environment.NewLine}");
-                                context.ExitCode = 1;
-                                return;
+                                return 1;
                             }
                         }
                         catch (JsonException ex)
                         {
                             console.WriteError($"Error parsing sites file: {ex.Message}{Environment.NewLine}");
-                            context.ExitCode = 1;
-                            return;
+                            return 1;
                         }
                     }
                     else if (rootUri != null)
@@ -312,8 +338,7 @@ namespace AzureSearchCrawler
                         if (!Uri.TryCreate(rootUri, UriKind.Absolute, out var uri))
                         {
                             console.WriteError($"Invalid root URI format: {rootUri}{Environment.NewLine}");
-                            context.ExitCode = 1;
-                            return;
+                            return 1;
                         }
                         else
                         {
@@ -330,7 +355,7 @@ namespace AzureSearchCrawler
                     if (sites == null || sites.Count == 0)
                     {
                         console.WriteLine("No sites to crawl.", LogLevel.Warning);
-                        return;
+                        return exitCode;
                     }
 
                     var queue = new CrawledPageQueue();
@@ -402,7 +427,7 @@ namespace AzureSearchCrawler
                         {
                             console.WriteError($"An error occurred while crawling {site.Uri}: {ex.Message}");
                             console.WriteLine($"Technical details: {ex}", LogLevel.Debug);
-                            context.ExitCode = 1;
+                            exitCode = 1;
                         }
                     }
 
@@ -413,16 +438,14 @@ namespace AzureSearchCrawler
                     await processorTask;
 
                     console.WriteLine("All tasks finished.", LogLevel.Information);
-
+                    return exitCode;
                 }
                 catch (Exception ex)
                 {
                     console.WriteError($"Error: {ex.Message}{Environment.NewLine}");
-                    context.ExitCode = 1;
+                    return 1;
                 }
-            });
-
-            return await rootCommand.InvokeAsync(args, systemConsole);
+            }
         }
     }
 }

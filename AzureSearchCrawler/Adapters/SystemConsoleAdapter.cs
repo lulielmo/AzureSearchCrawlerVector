@@ -1,10 +1,11 @@
-﻿using AzureSearchCrawler.Models;
+﻿using AzureSearchCrawler.Interfaces;
+using AzureSearchCrawler.Models;
 using System.Diagnostics.CodeAnalysis;
 
 namespace AzureSearchCrawler.Adapters;
 
 /// <summary>
-/// Adapter class that bridges System.CommandLine.IConsole to our own IConsole interface.
+/// Writes crawler log messages to the process console.
 /// This class is used only in production code as a fallback when running the actual CLI application.
 /// It's excluded from code coverage because:
 /// 1. It's a pure adapter with no business logic
@@ -13,53 +14,64 @@ namespace AzureSearchCrawler.Adapters;
 ///    which would be unreliable and not provide additional value
 /// </summary>
 [ExcludeFromCodeCoverage]
-public class SystemConsoleAdapter(System.CommandLine.IConsole console) : Interfaces.IConsole
+public class SystemConsoleAdapter : IConsole, IConsoleStreams
 {
-    private readonly System.CommandLine.IConsole _console = console;
     private bool _verbose;
 
+    /// <inheritdoc />
+    public TextWriter Output => Console.Out;
+
+    /// <inheritdoc />
+    public TextWriter Error => Console.Error;
+
+    /// <inheritdoc />
     public void WriteLine(string message, LogLevel level = LogLevel.Information)
     {
         switch (level)
         {
             case LogLevel.Error:
-                _console.Error.Write(message + Environment.NewLine);
+                Console.Error.WriteLine(message);
                 break;
             case LogLevel.Verbose:
                 if (_verbose)
-                    _console.Out.Write($"VERBOSE: {message}{Environment.NewLine}");
+                    Console.Out.WriteLine($"VERBOSE: {message}");
                 break;
             case LogLevel.Debug:
                 if (_verbose)
-                    _console.Out.Write($"DEBUG: {message}{Environment.NewLine}");
+                    Console.Out.WriteLine($"DEBUG: {message}");
                 break;
             default:
-                _console.Out.Write(message + Environment.NewLine);
+                Console.Out.WriteLine(message);
                 break;
         }
     }
 
-    public void WriteLine(string format, params object[] args) 
+    /// <inheritdoc />
+    public void WriteLine(string format, params object[] args)
         => WriteLine(string.Format(format, args));
 
-    public void WriteError(string message) 
+    /// <inheritdoc />
+    public void WriteError(string message)
         => WriteLine(message, LogLevel.Error);
 
+    /// <inheritdoc />
     public void WriteInfoLine(string format, params object[] args)
         => WriteLine(format, LogLevel.Information, args);
 
+    /// <inheritdoc />
     public void WriteDebugLine(string format, params object[] args)
         => WriteLine(format, LogLevel.Debug, args);
 
+    /// <inheritdoc />
     public void WriteVerboseLine(string format, params object[] args)
         => WriteLine(format, LogLevel.Verbose, args);
 
+    /// <inheritdoc />
     public void WriteWarningLine(string message, params object[] args)
     {
         WriteLine(string.Format(message, args), LogLevel.Warning);
     }
 
+    /// <inheritdoc />
     public void SetVerbose(bool verbose) => _verbose = verbose;
-
-    public System.CommandLine.IConsole GetInnerConsole() => _console;
 }

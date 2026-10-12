@@ -1,16 +1,18 @@
 namespace AzureSearchCrawler.TestUtilities
 {
+    using AzureSearchCrawler.Interfaces;
     using AzureSearchCrawler.Models;
-    using System.CommandLine.IO;
     using System.Text;
 
-    public class TestStandardStreamWriter(List<string> output) : IStandardStreamWriter
+    public class TestStandardStreamWriter(List<string> output) : TextWriter
     {
         private readonly List<string> _output = output;
         private readonly StringBuilder _buffer = new();
         private const int MaxBufferSize = 10 * 1024 * 1024; // 10MB
 
-        public void Write(string? value)
+        public override Encoding Encoding => Encoding.UTF8;
+
+        public override void Write(string? value)
         {
             if (value != null)
             {
@@ -26,7 +28,7 @@ namespace AzureSearchCrawler.TestUtilities
         public override string ToString() => string.Join(Environment.NewLine, _output);
     }
 
-    public class TestConsole : System.CommandLine.IConsole, AzureSearchCrawler.Interfaces.IConsole, IDisposable
+    public class TestConsole : IConsole, IConsoleStreams, IDisposable
     {
         private readonly List<string> _output = [];
         private readonly List<string> _errors = [];
@@ -34,19 +36,19 @@ namespace AzureSearchCrawler.TestUtilities
 
         public event Action<string, LogLevel>? LoggedMessage;
 
+        private readonly TextWriter _outputWriter;
+        private readonly TextWriter _errorWriter;
+
         public IReadOnlyList<string> Output => _output;
         public IReadOnlyList<string> Errors => _errors;
 
-        public IStandardStreamWriter Out { get; }
-        public bool IsOutputRedirected => false;
-        public IStandardStreamWriter Error { get; }
-        public bool IsErrorRedirected => false;
-        public bool IsInputRedirected => false;
+        TextWriter IConsoleStreams.Output => _outputWriter;
+        TextWriter IConsoleStreams.Error => _errorWriter;
 
         public TestConsole()
         {
-            Out = new TestStandardStreamWriter(_output);
-            Error = new TestStandardStreamWriter(_errors);
+            _outputWriter = new TestStandardStreamWriter(_output);
+            _errorWriter = new TestStandardStreamWriter(_errors);
         }
 
         private bool _disposed = false;
@@ -85,27 +87,27 @@ namespace AzureSearchCrawler.TestUtilities
             switch (level)
             {
                 case LogLevel.Error:
-                    Error.Write(message + Environment.NewLine);
+                    _errorWriter.Write(message + Environment.NewLine);
                     break;
                 case LogLevel.Warning:
-                    Out.Write("WARNING: " + message + Environment.NewLine);
+                    _outputWriter.Write("WARNING: " + message + Environment.NewLine);
                     break;
                 case LogLevel.Information:
-                    Out.Write(message + Environment.NewLine);
+                    _outputWriter.Write(message + Environment.NewLine);
                     break;
                 case LogLevel.Debug:
                     if (_verbose)
-                        Out.Write("DEBUG: " + message + Environment.NewLine);
+                        _outputWriter.Write("DEBUG: " + message + Environment.NewLine);
                     break;
                 case LogLevel.Verbose:
                     if (_verbose)
-                        Out.Write("VERBOSE: " + message + Environment.NewLine);
+                        _outputWriter.Write("VERBOSE: " + message + Environment.NewLine);
                     break;
             }
         }
 
-        public void WriteLine(string message) => Out.Write(message + Environment.NewLine);
-        public void WriteError(string message) => Error.Write(message + Environment.NewLine);
+        public void WriteLine(string message) => _outputWriter.Write(message + Environment.NewLine);
+        public void WriteError(string message) => _errorWriter.Write(message + Environment.NewLine);
         public void Clear()
         {
             _output.Clear();
@@ -113,7 +115,7 @@ namespace AzureSearchCrawler.TestUtilities
         }
 
         public void WriteLine(string format, params object[] args) =>
-            Out.Write(string.Format(format, args) + Environment.NewLine);
+            _outputWriter.Write(string.Format(format, args) + Environment.NewLine);
 
         public void WriteInfoLine(string format, params object[] args)
             => WriteLine(string.Format(format, args), LogLevel.Information);
