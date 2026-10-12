@@ -39,7 +39,10 @@ namespace AzureSearchCrawler.Tests
             var enricher = CreateEnricher(ocr.Object, downloader.Object);
             var extracted = _extractor.ExtractPage(KundoStyleHtml, new Uri("https://skekraft.kundo.se/guide"));
 
-            var result = await enricher.EnrichAsync(extracted, new Uri("https://skekraft.kundo.se/guide"));
+            var result = await enricher.EnrichAsync(
+                extracted,
+                new Uri("https://skekraft.kundo.se/guide"),
+                TestContext.Current.CancellationToken);
 
             Assert.Contains("120 år av förnybar el", result);
             ocr.Verify(e => e.RecognizeAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()), Times.Once);
@@ -57,7 +60,10 @@ namespace AzureSearchCrawler.Tests
             var enricher = CreateEnricher(ocr.Object, downloader.Object);
             var extracted = _extractor.ExtractPage(html, new Uri("https://example.com/article"));
 
-            var result = await enricher.EnrichAsync(extracted, new Uri("https://example.com/article"));
+            var result = await enricher.EnrichAsync(
+                extracted,
+                new Uri("https://example.com/article"),
+                TestContext.Current.CancellationToken);
 
             Assert.Contains(new string('x', 250), result);
             ocr.Verify(e => e.RecognizeAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -85,7 +91,10 @@ namespace AzureSearchCrawler.Tests
             var enricher = CreateEnricher(ocr.Object, downloader.Object);
             var extracted = _extractor.ExtractPage(html, new Uri("https://example.com/page"));
 
-            var result = await enricher.EnrichAsync(extracted, new Uri("https://example.com/page"));
+            var result = await enricher.EnrichAsync(
+                extracted,
+                new Uri("https://example.com/page"),
+                TestContext.Current.CancellationToken);
 
             Assert.Contains("Bank change details", result);
             ocr.Verify(e => e.RecognizeAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
@@ -101,7 +110,10 @@ namespace AzureSearchCrawler.Tests
             var enricher = CreateEnricher(ocr.Object, downloader.Object);
             var extracted = _extractor.ExtractPage(KundoStyleHtml, new Uri("https://skekraft.kundo.se/guide"));
 
-            var result = await enricher.EnrichAsync(extracted, new Uri("https://skekraft.kundo.se/guide"));
+            var result = await enricher.EnrichAsync(
+                extracted,
+                new Uri("https://skekraft.kundo.se/guide"),
+                TestContext.Current.CancellationToken);
 
             Assert.Equal(extracted.Text, result);
             ocr.Verify(e => e.RecognizeAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()), Times.Never);

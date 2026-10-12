@@ -30,7 +30,7 @@ namespace AzureSearchCrawler.IntegrationTests
             _httpClient = new HttpClient();
         }
 
-        public async Task InitializeAsync()
+        public async ValueTask InitializeAsync()
         {
             if (!Directory.Exists(_websitePath))
             {
@@ -99,7 +99,7 @@ namespace AzureSearchCrawler.IntegrationTests
             }
         }
 
-        public async Task DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             if (_webServerProcess != null)
             {

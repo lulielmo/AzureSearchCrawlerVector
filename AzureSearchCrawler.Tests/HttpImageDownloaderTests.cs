@@ -24,7 +24,9 @@ namespace AzureSearchCrawler.Tests
                 });
 
             var downloader = new HttpImageDownloader(new HttpClient(handler.Object));
-            await using var stream = await downloader.DownloadAsync(new Uri("https://example.com/image.png"));
+            await using var stream = await downloader.DownloadAsync(
+                new Uri("https://example.com/image.png"),
+                TestContext.Current.CancellationToken);
 
             Assert.NotNull(stream);
             Assert.Equal(4, stream!.Length);
@@ -42,7 +44,9 @@ namespace AzureSearchCrawler.Tests
                 .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.NotFound));
 
             var downloader = new HttpImageDownloader(new HttpClient(handler.Object));
-            var stream = await downloader.DownloadAsync(new Uri("https://example.com/missing.png"));
+            var stream = await downloader.DownloadAsync(
+                new Uri("https://example.com/missing.png"),
+                TestContext.Current.CancellationToken);
 
             Assert.Null(stream);
         }
@@ -51,7 +55,9 @@ namespace AzureSearchCrawler.Tests
         public async Task DownloadAsync_WhenSchemeIsNotHttp_ReturnsNull()
         {
             var downloader = new HttpImageDownloader();
-            var stream = await downloader.DownloadAsync(new Uri("file:///C:/temp/image.png"));
+            var stream = await downloader.DownloadAsync(
+                new Uri("file:///C:/temp/image.png"),
+                TestContext.Current.CancellationToken);
 
             Assert.Null(stream);
         }

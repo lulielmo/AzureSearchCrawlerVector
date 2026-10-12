@@ -59,7 +59,7 @@ public class VectorizedPageProcessorTests
         _queue.MarkAsComplete();
 
         // Act
-        await _processor.ProcessQueueAsync();
+        await _processor.ProcessQueueAsync(TestContext.Current.CancellationToken);
 
         // Assert
         var indexedDocuments = _searchClient.GetIndexedDocuments();
@@ -83,7 +83,7 @@ public class VectorizedPageProcessorTests
         _queue.MarkAsComplete();
 
         // Act
-        await _processor.ProcessQueueAsync();
+        await _processor.ProcessQueueAsync(TestContext.Current.CancellationToken);
 
         // Assert
         var indexedDocuments = _searchClient.GetIndexedDocuments();
@@ -104,7 +104,7 @@ public class VectorizedPageProcessorTests
         _queue.MarkAsComplete();
 
         // Act
-        await _processor.ProcessQueueAsync();
+        await _processor.ProcessQueueAsync(TestContext.Current.CancellationToken);
 
         // Assert
         var indexedDocuments = _searchClient.GetIndexedDocuments();
@@ -141,7 +141,7 @@ public class VectorizedPageProcessorTests
         _queue.MarkAsComplete();
 
         // Act & Assert
-        await Assert.ThrowsAsync<Exception>(() => processor.ProcessQueueAsync());
+        await Assert.ThrowsAsync<Exception>(() => processor.ProcessQueueAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -176,7 +176,7 @@ public class VectorizedPageProcessorTests
         _queue.MarkAsComplete();
 
         // Act
-        await dryRunProcessor.ProcessQueueAsync();
+        await dryRunProcessor.ProcessQueueAsync(TestContext.Current.CancellationToken);
 
         // Assert
         // Verifiera att dry run-meddelanden loggades
@@ -206,7 +206,7 @@ public class VectorizedPageProcessorTests
         _queue.MarkAsComplete();
 
         // Act
-        await _processor.ProcessQueueAsync();
+        await _processor.ProcessQueueAsync(TestContext.Current.CancellationToken);
 
         // Assert
         var indexedDocuments = _searchClient.GetIndexedDocuments();
@@ -239,7 +239,7 @@ public class VectorizedPageProcessorTests
         _queue.MarkAsComplete();
 
         // Act
-        await _processor.ProcessQueueAsync();
+        await _processor.ProcessQueueAsync(TestContext.Current.CancellationToken);
 
         // Assert
         // Verifiera att kö-status loggades efter första batchen (15 - 10 = 5 items kvar)

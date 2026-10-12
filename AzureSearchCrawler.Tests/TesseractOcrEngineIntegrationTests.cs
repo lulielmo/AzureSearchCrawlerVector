@@ -1,6 +1,7 @@
 using AzureSearchCrawler.Models;
 using AzureSearchCrawler.Ocr;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace AzureSearchCrawler.Tests
@@ -30,7 +31,10 @@ namespace AzureSearchCrawler.Tests
 
     public sealed class TesseractAvailableFactAttribute : FactAttribute
     {
-        public TesseractAvailableFactAttribute()
+        public TesseractAvailableFactAttribute(
+            [CallerFilePath] string? sourceFilePath = null,
+            [CallerLineNumber] int sourceLineNumber = -1)
+            : base(sourceFilePath, sourceLineNumber)
         {
             if (!IsTesseractAvailable())
             {

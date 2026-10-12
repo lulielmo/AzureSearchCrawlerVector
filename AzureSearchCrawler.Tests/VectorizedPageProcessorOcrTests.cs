@@ -34,7 +34,7 @@ public class VectorizedPageProcessorOcrTests
         _queue.Enqueue(page);
         _queue.MarkAsComplete();
 
-        await processor.ProcessQueueAsync();
+        await processor.ProcessQueueAsync(TestContext.Current.CancellationToken);
 
         var doc = Assert.Single(_searchClient.GetIndexedDocuments());
         Assert.Equal("Clean article text", doc["content"].ToString());
@@ -53,7 +53,7 @@ public class VectorizedPageProcessorOcrTests
         _queue.Enqueue(page);
         _queue.MarkAsComplete();
 
-        await processor.ProcessQueueAsync();
+        await processor.ProcessQueueAsync(TestContext.Current.CancellationToken);
 
         var doc = Assert.Single(_searchClient.GetIndexedDocuments());
         Assert.Equal("From HTML", doc["title"].ToString());
@@ -83,7 +83,7 @@ public class VectorizedPageProcessorOcrTests
         _queue.Enqueue(new CrawledWebPage(new Uri("https://example.com/thin"), "Utskick", html, 200));
         _queue.MarkAsComplete();
 
-        await processor.ProcessQueueAsync();
+        await processor.ProcessQueueAsync(TestContext.Current.CancellationToken);
 
         var doc = Assert.Single(_searchClient.GetIndexedDocuments());
         Assert.Contains("Vi byter bank: allt du behöver veta", doc["content"].ToString());
@@ -106,7 +106,7 @@ public class VectorizedPageProcessorOcrTests
         _queue.Enqueue(new CrawledWebPage(new Uri("https://example.com/thin"), "Utskick", html, 200));
         _queue.MarkAsComplete();
 
-        await processor.ProcessQueueAsync();
+        await processor.ProcessQueueAsync(TestContext.Current.CancellationToken);
 
         ocr.Verify(e => e.RecognizeAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()), Times.Never);
         Assert.Single(_searchClient.GetIndexedDocuments());
@@ -156,7 +156,7 @@ public class VectorizedPageProcessorOcrTests
         _queue.Enqueue(new CrawledWebPage(new Uri("https://example.com/thin"), "Utskick", html, 200));
         _queue.MarkAsComplete();
 
-        await processor.ProcessQueueAsync();
+        await processor.ProcessQueueAsync(TestContext.Current.CancellationToken);
 
         _consoleMock.Verify(
             c => c.WriteLine(It.Is<string>(s => s.Contains("[OCR PREVIEW] https://example.com/thin")), LogLevel.Information),
@@ -200,7 +200,7 @@ public class VectorizedPageProcessorOcrTests
         _queue.Enqueue(new CrawledWebPage(new Uri("https://example.com/thin"), "Utskick", html, 200));
         _queue.MarkAsComplete();
 
-        await processor.ProcessQueueAsync();
+        await processor.ProcessQueueAsync(TestContext.Current.CancellationToken);
 
         ocr.Verify(e => e.RecognizeAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()), Times.Once);
         _consoleMock.Verify(
@@ -224,7 +224,7 @@ public class VectorizedPageProcessorOcrTests
         _queue.Enqueue(new CrawledWebPage(new Uri("https://example.com/rich"), "Article", html, 200));
         _queue.MarkAsComplete();
 
-        await processor.ProcessQueueAsync();
+        await processor.ProcessQueueAsync(TestContext.Current.CancellationToken);
 
         _consoleMock.Verify(
             c => c.WriteLine(It.Is<string>(s => s.Contains("skip OCR (body text at or above threshold)")), LogLevel.Information),

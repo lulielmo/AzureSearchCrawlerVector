@@ -302,7 +302,7 @@ namespace AzureSearchCrawler.Tests
             await File.WriteAllTextAsync(tempFile, @"[
                 {""uri"": ""http://example.com"", ""maxDepth"": 3, ""domSelector"": ""div.blog-content""},
                 {""uri"": ""http://another-site.com"", ""maxDepth"": 5, ""domSelector"": ""div.articles""}
-            ]");
+            ]", TestContext.Current.CancellationToken);
 
             var args = new[]
             {
@@ -354,7 +354,7 @@ namespace AzureSearchCrawler.Tests
             await File.WriteAllTextAsync(tempFile, @"[
                 {""uri"": ""invalid-url""},
                 {""uri"": ""http://valid-site.com"", ""maxDepth"": 5}
-            ]");
+            ]", TestContext.Current.CancellationToken);
 
             var args = new[]
             {
@@ -433,7 +433,10 @@ namespace AzureSearchCrawler.Tests
             // Arrange
             var testConsole = new TestConsole();
             var tempFile = Path.GetTempFileName();
-            await File.WriteAllTextAsync(tempFile, "invalid json content");
+            await File.WriteAllTextAsync(
+                tempFile,
+                "invalid json content",
+                TestContext.Current.CancellationToken);
 
             var args = new[]
             {
@@ -492,7 +495,7 @@ namespace AzureSearchCrawler.Tests
             // Arrange
             var testConsole = new TestConsole();
             var sitesFilePath = Path.GetTempFileName();
-            await File.WriteAllTextAsync(sitesFilePath, "[]");
+            await File.WriteAllTextAsync(sitesFilePath, "[]", TestContext.Current.CancellationToken);
             var args = new[]
             {
                 "--sitesFile", sitesFilePath,
@@ -615,7 +618,7 @@ namespace AzureSearchCrawler.Tests
             await File.WriteAllTextAsync(tempFile, @"[
                 {""uri"": ""http://example.com"", ""maxDepth"": 3},
                 {""uri"": ""http://another-site.com"", ""maxDepth"": 5}
-            ]");
+            ]", TestContext.Current.CancellationToken);
 
             var args = new[]
             {
@@ -701,7 +704,7 @@ namespace AzureSearchCrawler.Tests
             await File.WriteAllTextAsync(tempFile, @"[
                 {""uri"": ""http://example.com"", ""maxDepth"": 3, ""contentSelector"": ""article.guide_article""},
                 {""uri"": ""http://another-site.com"", ""maxDepth"": 5}
-            ]");
+            ]", TestContext.Current.CancellationToken);
 
             var args = new[]
             {

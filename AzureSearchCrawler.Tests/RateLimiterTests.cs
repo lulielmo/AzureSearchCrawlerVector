@@ -33,7 +33,7 @@ namespace AzureSearchCrawler.Tests
 
             // Act
             stopwatch.Start();
-            await limiter.WaitAsync();
+            await limiter.WaitAsync(TestContext.Current.CancellationToken);
             stopwatch.Stop();
 
             // Assert
@@ -49,7 +49,7 @@ namespace AzureSearchCrawler.Tests
 
             // Act
             stopwatch.Start();
-            await limiter.WaitAsync();
+            await limiter.WaitAsync(TestContext.Current.CancellationToken);
             stopwatch.Stop();
 
             // Assert
@@ -64,10 +64,10 @@ namespace AzureSearchCrawler.Tests
             var limiter = new RateLimiter(waitTime);
             
             // Act
-            await limiter.WaitAsync(); // First call
+            await limiter.WaitAsync(TestContext.Current.CancellationToken); // First call
             var stopwatch = new Stopwatch();
             stopwatch.Start();
-            await limiter.WaitAsync(); // Second call
+            await limiter.WaitAsync(TestContext.Current.CancellationToken); // Second call
             stopwatch.Stop();
 
             // Assert
@@ -89,9 +89,9 @@ namespace AzureSearchCrawler.Tests
             {
                 tasks.Add(Task.Run(async () =>
                 {
-                    await limiter.WaitAsync();
+                    await limiter.WaitAsync(TestContext.Current.CancellationToken);
                     timestamps.Add(DateTime.UtcNow);
-                }));
+                }, TestContext.Current.CancellationToken));
             }
             await Task.WhenAll(tasks);
 
@@ -109,13 +109,13 @@ namespace AzureSearchCrawler.Tests
         {
             // Arrange
             var limiter = new RateLimiter(TimeSpan.FromSeconds(1));
-            await limiter.WaitAsync();
-            await Task.Delay(1500); // Wait longer than timespan
+            await limiter.WaitAsync(TestContext.Current.CancellationToken);
+            await Task.Delay(1500, TestContext.Current.CancellationToken); // Wait longer than timespan
 
             // Act
             var stopwatch = new Stopwatch();
             stopwatch.Start();
-            await limiter.WaitAsync();
+            await limiter.WaitAsync(TestContext.Current.CancellationToken);
             stopwatch.Stop();
 
             // Assert
@@ -168,7 +168,7 @@ namespace AzureSearchCrawler.Tests
             var cts = new CancellationTokenSource();
 
             // First call goes through directly
-            await rateLimiter.WaitAsync();
+            await rateLimiter.WaitAsync(TestContext.Current.CancellationToken);
 
             // Start the wait in a separate task (now we're in the delay)
             var waitTask = rateLimiter.WaitAsync(cts.Token);
