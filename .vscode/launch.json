@@ -10,7 +10,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/AzureSearchCrawler.Tests/bin/Debug/net8.0/AzureSearchCrawler.Tests.dll",
+            "program": "${workspaceFolder}/AzureSearchCrawler.Tests/bin/Debug/net10.0/AzureSearchCrawler.Tests.dll",
             "args": [],
             "cwd": "${workspaceFolder}/AzureSearchCrawler.Tests",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
